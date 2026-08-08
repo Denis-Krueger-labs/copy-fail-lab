@@ -1,22 +1,281 @@
-\section{Research Scope and Objectives}
+\section{Introduction and Vulnerability Overview}
 
-\subsection{Purpose}
+\subsection{Vulnerability Overview}
 
-This section will document the research background, technical context,
-scope, and objectives of the Copy Fail laboratory project.
+This report investigates CVE-2026-31431, commonly referred to as
+\emph{Copy Fail}, a local privilege escalation vulnerability in the Linux
+kernel. The goal is to reproduce the vulnerability in an isolated laboratory
+environment, understand the underlying bug, and use the observed behaviour to
+develop and test detection and mitigation approaches.
 
-\begin{findingbox}
-The report template compiled successfully and the research environment is
-ready for documentation.
-\end{findingbox}
+The vulnerability affects \code{algif\_aead}, the Linux kernel's userspace
+interface for AEAD algorithms exposed through \code{AF\_ALG} sockets. The
+vulnerable code incorrectly performs cryptographic operations in place even
+though the source and destination originate from different mappings. Combined
+with \code{splice()}, this can cause page-cache-backed data from a readable file
+to become part of a writable cryptographic scatterlist. Under the right
+conditions, an unprivileged process can therefore modify the cached contents
+of a file without having write permission to the file itself
+\cite{ubuntu-copyfail-cve,linux-copyfail-fix}.
 
-\begin{evidencebox}
-Evidence collected during the experiment is stored separately from the
-analytical report and linked to individual experimental phases.
-\end{evidencebox}
+The published Copy Fail research turns this behaviour into a deterministic,
+attacker-controlled four-byte write into the page cache of a readable file.
+By repeatedly applying this primitive to a suitable setuid-root executable,
+an otherwise unprivileged local user can modify the cached executable image
+and ultimately execute code with root privileges
+\cite{copyfail-research}.
 
-\begin{checkpointbox}
-\textbf{Status:} \statuspass
+Canonical classifies CVE-2026-31431 as a High-severity vulnerability with a
+CVSS 3.1 score of 7.8. Besides local privilege escalation on the host,
+Canonical also notes that the vulnerability may facilitate container escape
+scenarios in affected environments
+\cite{ubuntu-copyfail-cve}.
 
-The LaTeX reporting environment is operational.
-\end{checkpointbox}
+For this project, however, the interesting part is not simply whether the
+published exploit can produce a root shell. The more useful question is what
+actually happens on the system while the vulnerability is being exploited,
+which parts of that behaviour can be observed, and whether the exploitation
+path can be detected or restricted before the vendor patch is applied.
+
+\subsection{Technical Background and Vulnerability Mechanism}
+
+To understand Copy Fail, it is important to distinguish between a file on disk
+and the copy of its contents currently held in memory. Linux uses the page
+cache to keep recently accessed file data in memory, allowing subsequent reads
+and executions to use the cached pages instead of repeatedly accessing the
+underlying storage. A process with read access to a file may therefore cause
+its contents to enter the page cache, but this should not give that process the
+ability to modify those contents.
+
+Copy Fail breaks this assumption through an unexpected interaction between the
+page cache and the Linux kernel crypto API. Linux exposes parts of this API to
+userspace through \code{AF\_ALG} sockets. For authenticated encryption,
+\code{algif\_aead} provides the corresponding AEAD interface. AEAD
+(Authenticated Encryption with Associated Data) combines encryption with
+integrity protection and allows additional authenticated data to be included
+without encrypting it.
+
+Internally, cryptographic operations use scatterlists to describe the different
+regions of memory involved in an operation. In the vulnerable implementation,
+\code{algif\_aead} performs AEAD operations in place, meaning that the source
+and destination of the cryptographic request ultimately share the same
+scatterlist. This becomes problematic because the input and output do not
+necessarily originate from the same type of memory
+\cite{copyfail-research,linux-copyfail-fix}.
+
+The second important part of the vulnerability is \code{splice()}. This system
+call can move data between file descriptors without first copying it through a
+conventional userspace buffer. When data from a readable file is spliced through
+a pipe into an \code{AF\_ALG} socket, references to the file's page-cache pages
+can become part of the crypto input scatterlist. During AEAD decryption,
+\code{algif\_aead} copies the associated data and ciphertext into the receive
+buffer, but chains the authentication-tag region from the original input onto
+the destination scatterlist. As a result, file-backed page-cache memory can
+become reachable through a scatterlist that the cryptographic operation treats
+as writable \cite{copyfail-research}.
+
+This alone does not yet produce the controlled write used by Copy Fail. The
+final piece is the \code{authencesn} AEAD template. During decryption,
+\code{authencesn} temporarily rearranges IPsec Extended Sequence Number data
+and uses the destination scatterlist as scratch space. As part of this process,
+it performs a four-byte write beyond the legitimate AEAD output region. Under
+normal circumstances this affects the operation's destination buffer. Combined
+with the vulnerable in-place layout in \code{algif\_aead}, however, that write
+can instead reach one of the chained page-cache pages
+\cite{copyfail-research}.
+
+The attacker can control both the position of this write and the four-byte
+value being written. Even though the subsequent authentication check fails,
+the modification is not rolled back. The affected page is also not marked
+dirty for normal filesystem writeback, meaning the file on disk remains
+unchanged while its cached in-memory representation has been modified. The
+result is therefore a deterministic four-byte write into the page cache of a
+file that the attacker only needs permission to read
+\cite{copyfail-research}.
+
+This limited primitive is the central building block of Copy Fail. It does not
+grant root privileges by itself, but it creates something much more interesting
+from an exploitation perspective: the ability to modify executable data in
+memory without having normal write access to the underlying file. How this
+primitive is turned into privilege escalation is discussed in the following
+section.
+
+\subsection{Security Impact}
+
+At first glance, a controlled four-byte write may appear too limited to be useful
+for privilege escalation. The important limitation, however, is only the amount
+of data written during a single operation. Because the primitive is deterministic
+and repeatable, an attacker can perform multiple writes at controlled offsets and
+gradually modify a larger region of a cached file
+\cite{copyfail-research}.
+
+The published Copy Fail exploit demonstrates this by targeting
+\code{/usr/bin/su}, a setuid-root executable commonly available on Linux systems.
+Successive four-byte writes are used to modify executable code in the cached
+image of the binary. The file itself remains owned by root and retains its setuid
+permissions because neither its filesystem metadata nor its persistent contents
+need to be changed.
+
+When the modified executable is started, Linux uses the poisoned page-cache
+contents while still applying the privileges associated with the original
+setuid-root file. The injected code therefore executes in a privileged context,
+allowing a local unprivileged user to obtain root privileges. In other words, the
+attacker never needs legitimate write access to the executable. Read access,
+combined with the vulnerable kernel path, is enough to cross the privilege
+boundary \cite{copyfail-research}.
+
+An additional characteristic of Copy Fail is that the corrupted page is not
+marked dirty for normal filesystem writeback. The modification therefore exists
+in memory while the corresponding data on persistent storage remains unchanged.
+This makes the corruption temporary from the filesystem's perspective, but that
+does not reduce its immediate impact: the attacker only needs the modified
+executable to run once to turn the page-cache write into a root shell
+\cite{copyfail-research}.
+
+The impact is also not necessarily limited to processes running directly on the
+host. Canonical notes that the same vulnerability may facilitate container escape
+scenarios in affected environments, extending the security implications beyond
+a conventional local privilege escalation
+\cite{ubuntu-copyfail-cve}.
+
+The significance of Copy Fail is therefore much larger than the size of the
+individual write suggests. A four-byte primitive is enough to undermine the
+integrity of privileged executable code and ultimately turn an unprivileged local
+user into root.
+
+\subsection{Vendor Response and Mitigation}
+
+Following the public disclosure of Copy Fail, Canonical initially provided a
+temporary mitigation that removed access to the vulnerable kernel path rather
+than attempting to correct the underlying bug. An update to the \code{kmod}
+package prevented the \code{algif\_aead} module from being loaded, making the
+affected AF\_ALG AEAD interface unavailable through that module
+\cite{ubuntu-copyfail-cve}.
+
+If the module was already loaded, it additionally had to be unloaded or the
+system rebooted for the mitigation to become effective. Canonical explicitly
+treated this as a temporary measure. Applications that rely on the kernel AEAD
+interface may fall back to userspace cryptographic implementations, but this
+behaviour is not guaranteed and disabling the module may therefore cause
+compatibility or functionality problems
+\cite{ubuntu-copyfail-cve}.
+
+The original Copy Fail research also proposes restricting the attack surface by
+preventing creation of AF\_ALG sockets through mechanisms such as seccomp. Like
+disabling \code{algif\_aead}, this can prevent the vulnerable path from being
+reached, but it does not correct the vulnerability itself
+\cite{copyfail-research}.
+
+The central upstream fix instead addresses the underlying design problem in
+\code{algif\_aead}. The kernel change titled
+\emph{Revert to operating out-of-place} removes the problematic in-place
+operation introduced by an earlier optimization. Because the source and
+destination originate from different mappings, the kernel developers concluded
+that there was no practical benefit in sharing the same buffers. Restoring
+out-of-place operation keeps the cryptographic destination separate from the
+file-backed input pages and removes the condition that allowed page-cache memory
+to become writable through the AEAD operation
+\cite{linux-copyfail-fix}.
+
+Distribution kernel updates include this change together with related fixes in
+the AF\_ALG and authentication code. Once a corrected kernel is installed and
+the system has been rebooted into it, the temporary module-level mitigation is
+no longer required. Canonical therefore recommends updating to a fixed kernel
+instead of relying permanently on disabling \code{algif\_aead}
+\cite{ubuntu-copyfail-cve}.
+
+This distinction is important for the experimental part of this project.
+Disabling the vulnerable interface can stop exploitation, but it does so by
+removing functionality. The kernel patch instead removes the vulnerable
+behaviour itself. Both approaches provide useful reference points when evaluating
+whether additional detection or mitigation techniques can identify or interrupt
+Copy Fail without simply disabling the affected subsystem.
+
+\subsection{Research Objectives and Questions}
+
+The objective of this project is not limited to successfully executing the
+published Copy Fail proof of concept. Reproducing the privilege escalation is
+treated as the starting point for a broader investigation into how the
+vulnerability behaves, how that behaviour can be observed, and which defensive
+measures can meaningfully interrupt the exploitation path.
+
+The experimental workflow therefore follows the vulnerability through several
+states: first understanding and reproducing it, then observing and detecting its
+behaviour, applying a compensating control, comparing that control with the
+vendor mitigation, and finally retesting against a patched kernel.
+
+The investigation is guided by the following research questions:
+
+\begin{description}
+
+    \item[RQ1 Reproduction.]
+    Can Copy Fail be reproduced reliably in the isolated laboratory environment
+    by an ordinary, unprivileged local user?
+
+    \item[RQ2 Observability.]
+    Which system-level behaviours can be observed consistently while the
+    vulnerability is being exploited, and which of these provide useful
+    detection opportunities?
+
+    \item[RQ3 Detection.]
+    Can the exploitation technique be detected using behavioural indicators
+    rather than artifacts that are specific to a particular proof of concept,
+    such as its filename or executable hash?
+
+    \item[RQ4 Compensating Control.]
+    Can a defensive control interrupt the known exploitation path before the
+    kernel is patched, and can it do so without unnecessarily removing benign
+    functionality?
+
+    \item[RQ5 Vendor Comparison.]
+    How does the custom compensating control compare with Canonical's temporary
+    mitigation, which prevents \code{algif\_aead} from being loaded?
+
+    \item[RQ6 Patch Validation.]
+    Does reproduction fail after installation of a corrected kernel, and do the
+    observations from the final retest match the expected behaviour of the
+    upstream fix?
+
+\end{description}
+
+Together, these questions turn the published exploit into an experimental
+starting point rather than the final result. A successful root shell proves that
+the vulnerability can be reproduced, but the more useful outcome is understanding
+what distinguishes the vulnerable behaviour, how defenders can react to it, and
+what changes once the underlying kernel flaw is actually removed.
+
+\subsection{Scope and Safety}
+
+All experimentation in this project is restricted to systems owned and
+controlled for the purpose of the research and placed inside an isolated
+laboratory environment. No third-party or internet-facing systems are included
+in the test scope. The deliberately vulnerable reproduction target is kept
+separate from the patched reference system so that a known-good comparison state
+remains available throughout the project.
+
+Reproduction is performed from a dedicated unprivileged local account. For the
+purpose of this project, privilege escalation is considered successfully
+demonstrated once that account can execute a process with UID 0 and the result
+can be recorded using a minimal command such as \code{id}. No persistence,
+credential theft, lateral movement, or unrelated post-exploitation activity is
+required or performed.
+
+The experimental scope is limited to the published Copy Fail exploitation path
+involving the AF\_ALG AEAD interface and modification of file-backed page-cache
+contents. Potential container escape is relevant to the vulnerability's overall
+impact, but it is not reproduced as part of this project. Other Linux kernel
+vulnerabilities and unrelated privilege-escalation techniques are likewise
+outside the scope of the experiment.
+
+System state is recorded before vulnerability-specific changes or exploit
+execution. Snapshots and phase checkpoints are used so that an ambiguous or
+modified system can be restored rather than treated as a clean reference.
+Experimental evidence is collected separately from the analytical report. Raw
+artifacts are preserved privately with integrity verification, while material
+intended for public release is sanitized where necessary and receives separate
+integrity verification after sanitization.
+
+These boundaries keep the experiment focused on understanding, observing, and
+defending against Copy Fail while ensuring that the reproduction remains
+controlled, reversible, and limited to the behaviour required to answer the
+research questions.
