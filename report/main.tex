@@ -1,0 +1,551 @@
+\documentclass[11pt,a4paper]{article}
+
+% ============================================================
+% COPY FAIL — TECHNICAL SECURITY RESEARCH REPORT
+% ============================================================
+
+% ------------------------------------------------------------
+% Encoding & language
+% ------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+% ------------------------------------------------------------
+% Typography
+% ------------------------------------------------------------
+
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{parskip}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.7em}
+
+% ------------------------------------------------------------
+% Page layout
+% ------------------------------------------------------------
+
+\usepackage[
+    a4paper,
+    top=2.5cm,
+    bottom=2.6cm,
+    left=2.7cm,
+    right=2.7cm
+]{geometry}
+
+% ------------------------------------------------------------
+% Colour palette
+% ------------------------------------------------------------
+
+\usepackage{xcolor}
+
+% Mori / portfolio palette
+\definecolor{MoriPurple}{HTML}{9D4DFF}
+\definecolor{MoriLavender}{HTML}{C9C2D6}
+\definecolor{MoriMist}{HTML}{F4F0FF}
+\definecolor{MoriGray}{HTML}{9E9E9E}
+\definecolor{MoriInk}{HTML}{18171C}
+
+% Additional neutral tones derived from the palette
+\definecolor{MoriPaper}{HTML}{FFFFFF}
+\definecolor{MoriCode}{HTML}{F8F7FA}
+\definecolor{MoriRule}{HTML}{DED9E5}
+\definecolor{MoriMuted}{HTML}{68656D}
+
+\color{MoriInk}
+
+% ------------------------------------------------------------
+% Section styling
+% ------------------------------------------------------------
+
+\usepackage{titlesec}
+
+\titleformat{\section}
+    {\Large\bfseries\color{MoriInk}}
+    {\color{MoriPurple}\thesection}
+    {0.8em}
+    {}
+    [
+        \vspace{0.25em}
+        \color{MoriLavender}\titlerule
+    ]
+
+\titleformat{\subsection}
+    {\large\bfseries\color{MoriInk}}
+    {\color{MoriPurple}\thesubsection}
+    {0.75em}
+    {}
+
+\titleformat{\subsubsection}
+    {\normalsize\bfseries\color{MoriInk}}
+    {\color{MoriPurple}\thesubsubsection}
+    {0.75em}
+    {}
+
+\titlespacing*{\section}
+    {0pt}
+    {2.6em}
+    {1em}
+
+\titlespacing*{\subsection}
+    {0pt}
+    {1.8em}
+    {0.6em}
+
+\titlespacing*{\subsubsection}
+    {0pt}
+    {1.4em}
+    {0.4em}
+
+% ------------------------------------------------------------
+% Header & footer
+% ------------------------------------------------------------
+
+\usepackage{fancyhdr}
+
+\setlength{\headheight}{15pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+
+\fancyhead[L]{
+    \small\color{MoriMuted}
+    Copy Fail Research Report
+}
+
+\fancyhead[R]{
+    \small\color{MoriMuted}
+    CVE-2026-31431
+}
+
+\fancyfoot[C]{
+    \small\color{MoriMuted}
+    \thepage
+}
+
+\renewcommand{\headrulewidth}{0.4pt}
+
+\renewcommand{\headrule}{
+    \hbox to\headwidth{
+        \color{MoriLavender}
+        \leaders\hrule height \headrulewidth\hfill
+    }
+}
+
+\renewcommand{\footrulewidth}{0pt}
+
+% ------------------------------------------------------------
+% Hyperlinks & references
+% ------------------------------------------------------------
+
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=MoriPurple,
+    citecolor=MoriPurple,
+    urlcolor=MoriPurple,
+    pdfborder={0 0 0},
+    pdftitle={Copy Fail - CVE-2026-31431},
+    pdfsubject={Technical Security Research Report},
+    pdfauthor={Denis Krüger}
+}
+
+\usepackage[nameinlink,noabbrev]{cleveref}
+
+% ------------------------------------------------------------
+% Figures & tables
+% ------------------------------------------------------------
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{float}
+
+\captionsetup{
+    font=small,
+    labelfont={bf,color=MoriPurple},
+    textfont={color=MoriInk}
+}
+
+\renewcommand{\arraystretch}{1.15}
+
+% ------------------------------------------------------------
+% Lists
+% ------------------------------------------------------------
+
+\usepackage{enumitem}
+
+\setlist[itemize]{
+    topsep=0.4em,
+    itemsep=0.2em,
+    parsep=0pt
+}
+
+\setlist[enumerate]{
+    topsep=0.4em,
+    itemsep=0.2em,
+    parsep=0pt
+}
+
+% ------------------------------------------------------------
+% Terminal / code blocks
+% ------------------------------------------------------------
+
+\usepackage{listings}
+
+\lstdefinestyle{terminal}{
+    backgroundcolor=\color{MoriCode},
+    basicstyle=\ttfamily\small\color{MoriInk},
+    frame=single,
+    rulecolor=\color{MoriLavender},
+    framerule=0.6pt,
+    framesep=8pt,
+    breaklines=true,
+    breakatwhitespace=false,
+    columns=fullflexible,
+    keepspaces=true,
+    showstringspaces=false,
+    tabsize=4,
+    xleftmargin=0pt,
+    xrightmargin=0pt,
+    aboveskip=1em,
+    belowskip=1em
+}
+
+\lstset{style=terminal}
+
+% ============================================================
+% DOCUMENT
+% ============================================================
+
+\begin{document}
+
+% ============================================================
+% TITLE PAGE
+% ============================================================
+
+\begin{titlepage}
+
+    \thispagestyle{empty}
+
+    \vspace*{1.6cm}
+
+    % Top accent
+    {\color{MoriPurple}
+        \rule{\textwidth}{1.4pt}
+    }
+
+    \vspace{1.4cm}
+
+    {\small
+        \bfseries
+        \color{MoriMuted}
+        TECHNICAL SECURITY RESEARCH REPORT
+    }
+
+    \vspace{1.2cm}
+
+    {\Large
+        \color{MoriPurple}
+        CVE-2026-31431
+    }
+
+    \vspace{0.35cm}
+
+    {\Huge
+        \bfseries
+        \color{MoriInk}
+        Copy Fail
+    }
+
+    \vspace{0.9cm}
+
+    {\LARGE
+        \color{MoriInk}
+        Controlled Reproduction, Detection,\\
+        and Mitigation of a Linux Kernel\\
+        Local Privilege Escalation
+    }
+
+    \vspace{1.4cm}
+
+    {\large
+        \color{MoriMuted}
+        Security Research Laboratory Project
+    }
+
+    \vfill
+
+    % Metadata
+
+    \begin{tabular}{@{}p{3.2cm}p{10cm}@{}}
+
+        \textbf{\color{MoriMuted}Author}
+        &
+        Denis Krüger
+        \\[0.5em]
+
+        \textbf{\color{MoriMuted}Project}
+        &
+        Copy Fail Security Lab
+        \\[0.5em]
+
+        \textbf{\color{MoriMuted}Environment}
+        &
+        Isolated Proxmox Research Laboratory
+        \\[0.5em]
+
+        \textbf{\color{MoriMuted}Vulnerability}
+        &
+        CVE-2026-31431
+        \\[0.5em]
+
+        \textbf{\color{MoriMuted}Report Date}
+        &
+        \today
+
+    \end{tabular}
+
+    \vspace{1.5cm}
+
+    % Bottom accent
+
+    {\color{MoriLavender}
+        \rule{\textwidth}{1.4pt}
+    }
+
+\end{titlepage}
+
+% ============================================================
+% FRONT MATTER
+% ============================================================
+
+\pagenumbering{roman}
+
+% ------------------------------------------------------------
+% Abstract
+% ------------------------------------------------------------
+
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+This report documents the controlled analysis, reproduction, detection,
+mitigation, and retesting of CVE-2026-31431, commonly referred to as
+\emph{Copy Fail}.
+
+The research is conducted within an isolated laboratory environment and
+focuses not only on demonstrating the vulnerability, but on understanding
+the affected Linux kernel functionality, identifying observable behaviour,
+developing a custom detection strategy, evaluating a compensating control,
+and comparing those results with vendor-provided mitigations and patches.
+
+Evidence is collected throughout the experiment and preserved separately
+from the analytical report. Raw evidence is retained privately, while
+sanitized artifacts intended for public release receive their own integrity
+verification before being added to the repository.
+
+\clearpage
+
+% ------------------------------------------------------------
+% Table of contents
+% ------------------------------------------------------------
+
+\tableofcontents
+
+\clearpage
+
+% ============================================================
+% MAIN REPORT
+% ============================================================
+
+\pagenumbering{arabic}
+
+% ------------------------------------------------------------
+% Completed / current sections
+% ------------------------------------------------------------
+
+\input{sections/01-research}
+
+\input{sections/02-lab-setup}
+
+\input{sections/03-clean-baseline}
+
+\input{sections/04-vulnerability-analysis}
+
+% ------------------------------------------------------------
+% Future experimental sections
+% ------------------------------------------------------------
+
+% Uncomment these as each laboratory phase is completed.
+%
+% \input{sections/05-reproduction}
+%
+% \input{sections/06-detection}
+%
+% \input{sections/07-compensating-control}
+%
+% \input{sections/08-vendor-mitigation}
+%
+% \input{sections/09-retest}
+%
+% \input{sections/10-lessons-learned}
+
+% ============================================================
+% REFERENCES
+% ============================================================
+
+\clearpage
+
+\printbibliography[
+    heading=bibintoc,
+    title={References}
+]
+
+% ============================================================
+% APPENDICES
+% ============================================================
+
+\clearpage
+
+\appendix
+
+% ------------------------------------------------------------
+% Evidence overview
+% ------------------------------------------------------------
+
+\section{Evidence Overview}
+
+Experimental evidence is maintained separately from the analytical report
+under the repository's \code{evidence/} directory.
+
+Each experimental phase receives its own evidence directory containing the
+relevant command output, screenshots, integrity manifests, and other
+supporting artifacts.
+
+The report and evidence therefore serve different purposes:
+
+\begin{itemize}
+
+    \item
+    the report explains the methodology, observations, interpretation, and
+    conclusions;
+
+    \item
+    the evidence directories preserve the artifacts supporting those
+    conclusions.
+
+\end{itemize}
+
+Where sanitization is required for public release, the original artifact is
+preserved privately before modification.
+
+The public workflow is:
+
+\begin{lstlisting}
+raw evidence
+    |
+    v
+private integrity verification
+    |
+    v
+preserved private copy
+    |
+    v
+sanitized public artifact
+    |
+    v
+public integrity verification
+    |
+    v
+Git repository
+\end{lstlisting}
+
+This prevents the sanitized repository artifacts from being mistaken for the
+original raw evidence while still providing integrity verification for the
+public dataset.
+
+% ------------------------------------------------------------
+% Experimental status
+% ------------------------------------------------------------
+
+\section{Experimental Status}
+
+At the current stage of the project, the following phases are planned:
+
+\begin{table}[H]
+    \centering
+
+    \begin{tabular}{
+        @{}
+        p{0.42\textwidth}
+        p{0.25\textwidth}
+        @{}
+    }
+
+        \toprule
+
+        \textbf{Phase}
+        &
+        \textbf{Status}
+        \\
+
+        \midrule
+
+        Initial research
+        &
+        \statuspass
+        \\
+
+        Laboratory setup
+        &
+        \statuspass
+        \\
+
+        Clean baseline
+        &
+        \statuspass
+        \\
+
+        Vulnerability validation
+        &
+        \statuspass
+        \\
+
+        Controlled reproduction
+        &
+        \statuspending
+        \\
+
+        Detection engineering
+        &
+        \statuspending
+        \\
+
+        Custom compensating control
+        &
+        \statuspending
+        \\
+
+        Vendor mitigation comparison
+        &
+        \statuspending
+        \\
+
+        Final retest
+        &
+        \statuspending
+        \\
+
+        \bottomrule
+
+    \end{tabular}
+
+    \caption{Current experimental project status.}
+    \label{tab:experimental-status}
+
+\end{table}
+
+\end{document}
