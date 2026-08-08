@@ -436,6 +436,15 @@
             ([xshift=18mm,yshift=-21mm]current page.north west)
             --
             ([xshift=-18mm,yshift=-21mm]current page.north east);
+        % Project moth mark. The supplied artwork is kept deliberately ghosted
+        % so the cover reads as a research dossier first and MORI second.
+        \node[
+            anchor=north east,
+            inner sep=0pt,
+            opacity=0.22
+        ] at ([xshift=250mm,yshift=-100mm]current page.north east) {%
+            \includegraphics[width=500mm]{assets/moth-cover.png}%
+        };
         \node[
             anchor=south east,
             inner sep=0pt,
@@ -456,17 +465,17 @@
         CVE-2026-31431
     }
 
-    \vspace{2.25cm}
+    \vspace{4.25cm}
 
     {\displayfont\bfseries\fontsize{54}{52}\selectfont
-        COPY\\[-0.03em]
+        COPY
         \textcolor{MoriPurple}{FAIL}
     }
 
     \vspace{0.75cm}
 
     {\displayfont\LARGE\color{MoriPaper}
-        Controlled Reproduction, Detection,\\[0.15em]
+        A Controlled Reproduction, Detection,\\[0.15em]
         and Mitigation of a Linux Kernel\\[0.15em]
         Local Privilege Escalation
     }
@@ -592,15 +601,16 @@ verification before being added to the repository.
 
 \input{sections/01-research}
 
+\input{sections/02-lab-setup}
 
+\input{sections/03-clean-baseline}
+
+\input{sections/04-vulnerability-analysis}
 
 % ------------------------------------------------------------
 % Future sections
 % ------------------------------------------------------------
 
-% \input{sections/02-lab-setup}
-% \input{sections/03-clean-baseline}
-% \input{sections/04-vulnerability-analysis}
 % \input{sections/05-reproduction}
 % \input{sections/06-detection}
 % \input{sections/07-compensating-control}
