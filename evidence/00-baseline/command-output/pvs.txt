@@ -1,0 +1,2 @@
+  PV         VG        Fmt  Attr PSize   PFree 
+  /dev/sda3  ubuntu-vg lvm2 a--  <28.95g 14.47g

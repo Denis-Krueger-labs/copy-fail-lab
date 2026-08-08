@@ -1,0 +1,2 @@
+  VG        #PV #LV #SN Attr   VSize   VFree 
+  ubuntu-vg   1   1   0 wz--n- <28.95g 14.47g

@@ -1,0 +1,14 @@
+ Static hostname: copyfail01
+       Icon name: computer-vm
+         Chassis: vm 🖴
+      Machine ID: <REDACTED_MACHINE_ID>
+         Boot ID: <REDACTED_BOOT_ID>
+  Virtualization: kvm
+Operating System: Ubuntu 24.04.2 LTS
+          Kernel: Linux 6.8.0-137-generic
+    Architecture: x86-64
+ Hardware Vendor: QEMU
+  Hardware Model: Standard PC _Q35 + ICH9, 2009_
+Firmware Version: 4.2025.05-2
+   Firmware Date: Thu 2025-11-13
+    Firmware Age: 8month 3w 3d

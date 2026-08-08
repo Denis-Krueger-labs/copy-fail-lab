@@ -1,0 +1,2 @@
+ii  linux-image-6.8.0-137-generic         6.8.0-137.137                           amd64        Signed kernel image generic
+ii  linux-image-generic                   6.8.0-137.137                           amd64        Generic Linux kernel image

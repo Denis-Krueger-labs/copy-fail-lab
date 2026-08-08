@@ -1,0 +1,3 @@
+default via <LAB_GATEWAY> dev enp6s18 proto dhcp src <LAB_VM_IP> metric 100 
+<LAB_SUBNET> dev enp6s18 proto kernel scope link src <LAB_VM_IP> metric 100 
+<LAB_GATEWAY> dev enp6s18 proto dhcp scope link src <LAB_VM_IP> metric 100 
