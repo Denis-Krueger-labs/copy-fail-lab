@@ -1,0 +1,4 @@
+=== YARA environment ===
+Sun Aug  9 07:04:14 PM UTC 2026
+6.8.0-116-generic
+4.5.0

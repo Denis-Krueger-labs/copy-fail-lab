@@ -1,0 +1,17 @@
+=== YARA test: harmless one-byte variant ===
+Sun Aug  9 07:14:21 PM UTC 2026
+
+=== Original ===
+d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61  /home/labuser/copy_fail_exp.py
+731 /home/labuser/copy_fail_exp.py
+
+=== Variant ===
+a567d09b15f6e4440e70c9f2aa8edec8ed59f53301952df05c719aa3911687f9  /tmp/copy_fail_exp-harmless-variant.py
+732 /tmp/copy_fail_exp-harmless-variant.py
+
+Modification: one trailing newline only
+Variant was NOT executed.
+
+=== YARA result ===
+No YARA rule matched.
+RESULT: NO MATCH

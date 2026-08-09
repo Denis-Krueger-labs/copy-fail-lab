@@ -1,0 +1,6 @@
+=== YARA test: original known PoC ===
+Sun Aug  9 07:10:18 PM UTC 2026
+d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61  /home/labuser/copy_fail_exp.py
+
+CopyFail_Known_PoC_Exact_Hash /home/labuser/copy_fail_exp.py
+yara exit=0
