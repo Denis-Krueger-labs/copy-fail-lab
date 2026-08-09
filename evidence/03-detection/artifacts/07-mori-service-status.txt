@@ -1,0 +1,20 @@
+● mori-integrity.service - MORI Privileged Executable Integrity Monitor
+     Loaded: loaded (/etc/systemd/system/mori-integrity.service; enabled; preset: enabled)
+     Active: active (running) since Sun 2026-08-09 15:27:04 UTC; 1h 12min ago
+   Main PID: 3992 (python3)
+      Tasks: 1 (limit: 4520)
+     Memory: 6.0M (peak: 6.5M)
+        CPU: 52.947s
+     CGroup: /system.slice/mori-integrity.service
+             └─3992 /usr/bin/python3 -u /usr/local/lib/copyfail-detector/mori_integrity_watch.py
+
+Aug 09 15:27:04 copyfail-vuln python3[3992]: [2026-08-09T15:27:04.563102+00:00] Watching 12 privileged files
+Aug 09 15:27:04 copyfail-vuln python3[3992]: [2026-08-09T15:27:04.563133+00:00] Baseline: /etc/copyfail-detector/suid-known-good.tsv
+Aug 09 15:27:04 copyfail-vuln python3[3992]: [2026-08-09T15:27:04.563143+00:00] Check interval: 0.25 seconds
+Aug 09 15:32:31 copyfail-vuln python3[3992]:  /\_/\
+Aug 09 15:32:31 copyfail-vuln python3[3992]: ( Ò.Ó )   MORI: INTEGRITY VIOLATION.
+Aug 09 15:32:31 copyfail-vuln python3[3992]:  > ^ <
+Aug 09 15:32:31 copyfail-vuln python3[3992]: [2026-08-09T15:32:31.501808+00:00] ALERT
+Aug 09 15:32:31 copyfail-vuln python3[3992]: path=/usr/bin/su
+Aug 09 15:32:31 copyfail-vuln python3[3992]: expected=c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+Aug 09 15:32:31 copyfail-vuln python3[3992]: observed=44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9

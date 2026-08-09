@@ -1,0 +1,30 @@
+[Unit]
+Description=MORI Privileged Executable Integrity Monitor
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -u /usr/local/lib/copyfail-detector/mori_integrity_watch.py
+
+DynamicUser=yes
+NoNewPrivileges=yes
+
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+RestrictSUIDSGID=yes
+
+Restart=on-failure
+RestartSec=2
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

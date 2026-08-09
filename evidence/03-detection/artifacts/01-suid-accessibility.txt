@@ -1,0 +1,18 @@
+=== Copy Fail SUID accessibility from labuser ===
+Sun Aug  9 02:44:53 PM UTC 2026
+6.8.0-116-generic
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+
+/usr/bin/chfn                                           read=yes exec=yes
+/usr/bin/chsh                                           read=yes exec=yes
+/usr/bin/fusermount3                                    read=yes exec=yes
+/usr/bin/gpasswd                                        read=yes exec=yes
+/usr/bin/mount                                          read=yes exec=yes
+/usr/bin/newgrp                                         read=yes exec=yes
+/usr/bin/passwd                                         read=yes exec=yes
+/usr/bin/su                                             read=yes exec=yes
+/usr/bin/sudo                                           read=yes exec=yes
+/usr/bin/umount                                         read=yes exec=yes
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper             read=yes exec=no 
+/usr/lib/openssh/ssh-keysign                            read=yes exec=yes
+/usr/lib/polkit-1/polkit-agent-helper-1                 read=yes exec=yes

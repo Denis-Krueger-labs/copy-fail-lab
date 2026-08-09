@@ -1,0 +1,7 @@
+Aug 09 15:32:31 copyfail-vuln python3[3992]:  /\_/\
+Aug 09 15:32:31 copyfail-vuln python3[3992]: ( Ò.Ó )   MORI: INTEGRITY VIOLATION.
+Aug 09 15:32:31 copyfail-vuln python3[3992]:  > ^ <
+Aug 09 15:32:31 copyfail-vuln python3[3992]: [2026-08-09T15:32:31.501808+00:00] ALERT
+Aug 09 15:32:31 copyfail-vuln python3[3992]: path=/usr/bin/su
+Aug 09 15:32:31 copyfail-vuln python3[3992]: expected=c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+Aug 09 15:32:31 copyfail-vuln python3[3992]: observed=44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9

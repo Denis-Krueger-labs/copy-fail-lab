@@ -1,0 +1,104 @@
+=== Copy Fail privileged target inventory ===
+Sun Aug  9 02:42:42 PM UTC 2026
+6.8.0-116-generic
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+
+=== Root-owned SUID files ===
+
+=== /usr/bin/chfn ===
+mode=-rwsr-xr-x owner=root group=root size=72792
+9d8e1c2f1c89f808206c65982fa058369de1af7be19ee325a2f3e95c48ab8052  /usr/bin/chfn
+passwd: /usr/bin/chfn
+
+=== /usr/bin/chsh ===
+mode=-rwsr-xr-x owner=root group=root size=44760
+d7aad828e159b1d570f643d2cbe44d551a5b9bc9b2870dab3fd5cbc5260e749d  /usr/bin/chsh
+passwd: /usr/bin/chsh
+
+=== /usr/bin/fusermount3 ===
+mode=-rwsr-xr-x owner=root group=root size=39296
+d278775c1528dd32efc85c2cb322423ee93aa8dcf76aaa595f7022d427910704  /usr/bin/fusermount3
+package=UNKNOWN
+
+=== /usr/bin/gpasswd ===
+mode=-rwsr-xr-x owner=root group=root size=76248
+b9ef1bde0bde1b6839a0f55d43a606645723436932f072e3bf71e4c1a0ed4c06  /usr/bin/gpasswd
+passwd: /usr/bin/gpasswd
+
+=== /usr/bin/mount ===
+mode=-rwsr-xr-x owner=root group=root size=51584
+ac5aa68d34add5a33ae81ac3a971aea677c4032d768aab5a3c4c2707f728885e  /usr/bin/mount
+mount: /usr/bin/mount
+
+=== /usr/bin/newgrp ===
+mode=-rwsr-xr-x owner=root group=root size=40664
+572ab15948df3969e929b902641c3a42e76dce7d71a22fbc58011ca89d8d965e  /usr/bin/newgrp
+login: /usr/bin/newgrp
+
+=== /usr/bin/passwd ===
+mode=-rwsr-xr-x owner=root group=root size=64152
+ca3fc307dda8259f585bb38c70e82bd15af61e8574cd0d6e430292e328bb3477  /usr/bin/passwd
+passwd: /usr/bin/passwd
+
+=== /usr/bin/su ===
+mode=-rwsr-xr-x owner=root group=root size=55680
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+util-linux: /usr/bin/su
+
+=== /usr/bin/sudo ===
+mode=-rwsr-xr-x owner=root group=root size=277936
+136f2e48b0295b9fc595b8259cf2411ac43f27ddbfe02b956649ddaa2e92b9fa  /usr/bin/sudo
+sudo: /usr/bin/sudo
+
+=== /usr/bin/umount ===
+mode=-rwsr-xr-x owner=root group=root size=39296
+2ea59b57d249d58c64b028b2acf6118b62dc3ba89012a1cf4ff5f5a9891f513d  /usr/bin/umount
+mount: /usr/bin/umount
+
+=== /usr/lib/dbus-1.0/dbus-daemon-launch-helper ===
+mode=-rwsr-xr-- owner=root group=messagebus size=34960
+32e2e15486ffc385dfdb567032efd508aa6cc15ceb928092ac443ffcb20a3513  /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+dbus: /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+
+=== /usr/lib/openssh/ssh-keysign ===
+mode=-rwsr-xr-x owner=root group=root size=342632
+013d650c50303b3b1e6de5c1ac7cf54e4b7f4b495e395505d6108c3bcaa03cf6  /usr/lib/openssh/ssh-keysign
+openssh-client: /usr/lib/openssh/ssh-keysign
+
+=== /usr/lib/polkit-1/polkit-agent-helper-1 ===
+mode=-rwsr-xr-x owner=root group=root size=18736
+247c6edddaad60021a93cea19994a4f66f27c897890b18281ab144fb05e9db8f  /usr/lib/polkit-1/polkit-agent-helper-1
+polkitd: /usr/lib/polkit-1/polkit-agent-helper-1
+
+=== File capabilities ===
+/usr/lib/snapd/snap-confine cap_chown,cap_dac_override,cap_dac_read_search,cap_fowner,cap_setgid,cap_setuid,cap_sys_chroot,cap_sys_ptrace,cap_sys_admin,cap_sys_resource=p
+/usr/lib/x86_64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper cap_net_bind_service,cap_net_admin,cap_sys_nice=ep
+/usr/bin/mtr-packet cap_net_raw=ep
+/usr/bin/ping cap_net_raw=ep
+
+=== Relevant mount options ===
+/                              rw,relatime
+├─/sys                         rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/firmware/efi/efivars  rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/kernel/security       rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/fs/cgroup             rw,nosuid,nodev,noexec,relatime,nsdelegate,memory_recursiveprot
+│ ├─/sys/fs/pstore             rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/fs/bpf                rw,nosuid,nodev,noexec,relatime,mode=700
+│ ├─/sys/kernel/tracing        rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/kernel/debug          rw,nosuid,nodev,noexec,relatime
+│ ├─/sys/fs/fuse/connections   rw,nosuid,nodev,noexec,relatime
+│ └─/sys/kernel/config         rw,nosuid,nodev,noexec,relatime
+├─/proc                        rw,nosuid,nodev,noexec,relatime
+│ └─/proc/sys/fs/binfmt_misc   rw,relatime,fd=32,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=3750
+│   └─/proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime
+├─/dev                         rw,nosuid,relatime,size=1928628k,nr_inodes=482157,mode=755,inode64
+│ ├─/dev/pts                   rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000
+│ ├─/dev/shm                   rw,nosuid,nodev,inode64
+│ ├─/dev/hugepages             rw,nosuid,nodev,relatime,pagesize=2M
+│ └─/dev/mqueue                rw,nosuid,nodev,noexec,relatime
+├─/run                         rw,nosuid,nodev,noexec,relatime,size=394096k,mode=755,inode64
+│ ├─/run/lock                  rw,nosuid,nodev,noexec,relatime,size=5120k,inode64
+│ ├─/run/user/1001             rw,nosuid,nodev,relatime,size=394092k,nr_inodes=98523,mode=700,uid=1001,gid=1001,inode64
+│ └─/run/user/1000             rw,nosuid,nodev,relatime,size=394092k,nr_inodes=98523,mode=700,uid=1000,gid=1000,inode64
+└─/boot                        rw,relatime
+  └─/boot/efi                  rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro

@@ -1,0 +1,9 @@
+=== Copy Fail protected detector baseline ===
+Sun Aug  9 02:56:53 PM UTC 2026
+6.8.0-116-generic
+uid=1000(researcher) gid=1000(researcher) groups=1000(researcher),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),101(lxd)
+
+drwxr-xr-x 2 root root 4096 Aug  9 14:54 /etc/copyfail-detector
+-rw-r--r-- 1 root root 1016 Aug  9 14:54 /etc/copyfail-detector/suid-known-good.tsv
+
+c5ebe8afe16326aea860317b153981a43e57f3d462c3e1d03d3d1bbe5d951e74  /etc/copyfail-detector/suid-known-good.tsv
