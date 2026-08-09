@@ -1,0 +1,32 @@
+=== Copy Fail + MORI Guard: final controlled retest ===
+Sun Aug  9 06:32:52 PM UTC 2026
+6.8.0-116-generic
+
+=== Attacker context ===
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+
+=== Target before attempt ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+
+=== Module before attempt ===
+PASS: algif_aead blocked/unloaded
+
+=== Exact PoC attempt ===
+Traceback (most recent call last):
+  File "/home/labuser/copy_fail_exp.py", line 9, in <module>
+    [PoC source line omitted from public evidence]
+  File "/home/labuser/copy_fail_exp.py", line 5, in c
+    [PoC source line omitted from public evidence]
+FileNotFoundError: [Errno 2] No such file or directory
+
+PoC exit status: 1
+
+=== Post-attempt attacker context ===
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+labuser
+
+=== Target after attempt ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+
+=== Module after attempt ===
+PASS: algif_aead remains blocked

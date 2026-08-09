@@ -1,0 +1,25 @@
+=== MORI Guard deployed state ===
+Sun Aug  9 06:32:52 PM UTC 2026
+6.8.0-116-generic
+
+=== Guard configuration ===
+-rw-r--r-- 1 root root 244 Aug  9 17:55 /etc/modprobe.d/mori-copyfail-guard.conf
+# MORI Guard
+# Compensating control for CVE-2026-31431 / Copy Fail.
+# Prevent algif_aead from being inserted while the vulnerable kernel is retained
+# for controlled laboratory testing.
+
+install algif_aead /usr/local/sbin/mori-block-algif-aead
+
+=== Blocker implementation ===
+-rwxr-xr-x 1 root root 595 Aug  9 18:05 /usr/local/sbin/mori-block-algif-aead
+7c7581351f910f902bf4e88576b25275e89c5e042d451934591194945b5aaf40  /usr/local/sbin/mori-block-algif-aead
+
+=== modprobe resolution ===
+install /usr/local/sbin/mori-block-algif-aead 
+
+=== Relevant kernel modules ===
+af_alg 32768 0 - Live 0x0000000000000000
+
+=== MORI Monitor ===
+active

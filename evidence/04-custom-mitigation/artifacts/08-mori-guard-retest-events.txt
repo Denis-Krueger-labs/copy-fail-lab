@@ -1,0 +1,34 @@
+Aug 09 18:32:52 copyfail-vuln mori-guard[1420]: control=mori-guard action=DENY module=algif_aead reason=CVE-2026-31431
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]:             ⁺‧₊˚ ཐི⋆♱⋆ཋྀ ˚₊‧⁺
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]:  /\_/\
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: ( Ò.Ó )   MORI GUARD
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]:  > ^ <
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: One of my trusted moths has informed me
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: that you are touching my binaries.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: I do not share my binaries.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: They are mine.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: Begone.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: You are scaring the moths.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1422]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1437]: control=mori-guard action=DENY module=algif_aead reason=CVE-2026-31431
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]:             ⁺‧₊˚ ཐི⋆♱⋆ཋྀ ˚₊‧⁺
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]:  /\_/\
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: ( Ò.Ó )   MORI GUARD
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]:  > ^ <
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: One of my trusted moths has informed me
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: that you are touching my binaries.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: I do not share my binaries.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: They are mine.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: 
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: Begone.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: You are scaring the moths.
+Aug 09 18:32:52 copyfail-vuln mori-guard[1439]: 

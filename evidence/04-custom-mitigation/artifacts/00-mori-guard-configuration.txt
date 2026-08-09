@@ -1,0 +1,13 @@
+=== MORI Guard configuration ===
+Sun Aug  9 06:27:29 PM UTC 2026
+6.8.0-116-generic
+
+# MORI Guard
+# Compensating control for CVE-2026-31431 / Copy Fail.
+# Prevent algif_aead from being inserted while the vulnerable kernel is retained
+# for controlled laboratory testing.
+
+install algif_aead /usr/local/sbin/mori-block-algif-aead
+
+=== modprobe resolution ===
+install /usr/local/sbin/mori-block-algif-aead 

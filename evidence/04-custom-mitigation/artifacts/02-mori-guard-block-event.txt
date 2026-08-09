@@ -1,0 +1,17 @@
+Aug 09 18:09:02 copyfail-vuln mori-guard[1199]: control=mori-guard action=DENY module=algif_aead reason=CVE-2026-31431
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: 
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]:             ⁺‧₊˚ ཐི⋆♱⋆ཋྀ ˚₊‧⁺
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: 
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]:  /\_/\
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: ( Ò.Ó )   MORI GUARD
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]:  > ^ <
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: 
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: One of my trusted moths has informed me
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: that you are touching my binaries.
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: 
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: I do not share my binaries.
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: They are mine.
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: 
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: Begone.
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: You are scaring the moths.
+Aug 09 18:09:02 copyfail-vuln mori-guard[1201]: 

@@ -1,0 +1,16 @@
+=== MORI Guard post-attempt verification ===
+Sun Aug  9 06:30:35 PM UTC 2026
+6.8.0-116-generic
+uid=1000(researcher) gid=1000(researcher) groups=1000(researcher),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),101(lxd)
+
+=== MORI Monitor ===
+active
+
+=== Protected target ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+
+=== Vulnerable module ===
+PASS: algif_aead remains blocked
+
+=== Integrity alerts during Copy Fail attempt ===
+-- No entries --

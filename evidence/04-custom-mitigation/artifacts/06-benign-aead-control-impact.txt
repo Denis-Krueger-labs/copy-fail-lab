@@ -1,0 +1,8 @@
+=== Benign AF_ALG AEAD compatibility test ===
+uid=1001 gid=1001
+operation=bind AF_ALG AEAD gcm(aes)
+
+EXPECTED: benign AEAD bind failed while MORI Guard is active
+exception=FileNotFoundError
+errno=2
+message=No such file or directory
