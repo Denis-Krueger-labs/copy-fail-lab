@@ -1,0 +1,9 @@
+=== Copy Fail page-cache vs backing filesystem ===
+Sat Aug  8 11:28:41 PM UTC 2026
+6.8.0-116-generic
+
+=== Mounted/VFS view ===
+44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9  /usr/bin/su
+
+=== ext4 backing filesystem view ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  -

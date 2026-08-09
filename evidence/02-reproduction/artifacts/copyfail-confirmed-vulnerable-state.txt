@@ -1,0 +1,23 @@
+=== Copy Fail confirmed vulnerable state ===
+Sat Aug  8 10:55:47 PM UTC 2026
+6.8.0-116-generic
+
+=== Historical kernel packages ===
+linux-image-6.8.0-116-generic	6.8.0-116.116
+linux-modules-6.8.0-116-generic	6.8.0-116.116
+linux-modules-extra-6.8.0-116-generic	6.8.0-116.116
+
+=== AEAD modules ===
+algif_aead             12288  0
+af_alg                 32768  1 algif_aead
+
+=== algif_aead resolution ===
+
+=== Unprivileged subject ===
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+
+=== Mounted/VFS su hash ===
+44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9  /usr/bin/su
+
+=== Backing ext4 su hash ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  -

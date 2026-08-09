@@ -1,0 +1,6 @@
+=== Copy Fail reboot recovery ===
+Sat Aug  8 11:36:42 PM UTC 2026
+6.8.0-116-generic
+uid=1000(researcher) gid=1000(researcher) groups=1000(researcher),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),101(lxd)
+-rwsr-xr-x root root 55680 /usr/bin/su
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
