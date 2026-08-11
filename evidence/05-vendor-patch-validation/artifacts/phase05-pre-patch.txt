@@ -1,0 +1,60 @@
+=== PHASE 05 PRE-PATCH BASELINE ===
+
+=== DATE ===
+2026-08-11T19:23:27+00:00
+
+=== HOST ===
+ Static hostname: copyfail-vuln
+       Icon name: computer-vm
+         Chassis: vm 🖴
+      Machine ID: 60de96d503844b489f49ca233b13d72e
+         Boot ID: d92668536ff8442bb9d75e3a42e753b4
+  Virtualization: kvm
+Operating System: Ubuntu 24.04.2 LTS
+          Kernel: Linux 6.8.0-137-generic
+    Architecture: x86-64
+ Hardware Vendor: QEMU
+  Hardware Model: Standard PC _Q35 + ICH9, 2009_
+Firmware Version: 4.2025.05-2
+   Firmware Date: Thu 2025-11-13
+    Firmware Age: 8month 4w
+
+=== KERNEL ===
+Linux copyfail-vuln 6.8.0-137-generic #137-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 17 20:28:23 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+6.8.0-137-generic
+
+=== INSTALLED UBUNTU KERNELS ===
+ii  linux-image-6.8.0-116-generic          6.8.0-116.116 amd64        Signed kernel image generic
+ii  linux-image-6.8.0-137-generic          6.8.0-137.137 amd64        Signed kernel image generic
+ii  linux-image-generic                    6.8.0-137.137 amd64        Generic Linux kernel image
+ii  linux-modules-6.8.0-116-generic        6.8.0-116.116 amd64        Linux kernel extra modules for version 6.8.0 on 64 bit x86 SMP
+ii  linux-modules-6.8.0-137-generic        6.8.0-137.137 amd64        Linux kernel extra modules for version 6.8.0 on 64 bit x86 SMP
+ii  linux-modules-extra-6.8.0-116-generic  6.8.0-116.116 amd64        Linux kernel extra modules for version 6.8.0 on 64 bit x86 SMP
+ii  linux-modules-extra-6.8.0-137-generic  6.8.0-137.137 amd64        Linux kernel extra modules for version 6.8.0 on 64 bit x86 SMP
+
+=== CURRENT USER ===
+uid=1000(researcher) gid=1000(researcher) groups=1000(researcher),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),101(lxd)
+
+=== LABUSER ===
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+
+=== SUID TARGET BASELINE ===
+-rwsr-xr-x 1 root root 55680 Mar  6 16:00 /usr/bin/su
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+
+=== AF_ALG MODULE STATE ===
+
+=== MODPROBE CONFIG REFERENCES ===
+/etc/modprobe.d/disable-algif_aead.conf.disabled:1:# Disable algif_aead module due to CVE-2026-31431 (AKA copy.fail)
+/etc/modprobe.d/disable-algif_aead.conf.disabled:5:install algif_aead /bin/false
+/etc/modprobe.d/mori-copyfail-guard.conf.disabled-v2-2-test:3:# Prevent algif_aead from being inserted while the vulnerable kernel is retained
+/etc/modprobe.d/mori-copyfail-guard.conf.disabled-v2-2-test:6:install algif_aead /usr/local/sbin/mori-block-algif-aead
+
+=== MORI PROCESSES ===
+mori-in+     710  1.2  0.4  25448 16700 ?        Ss   19:12   0:08 /usr/bin/python3 -u /usr/local/lib/copyfail-detector/mori_integrity_watch.py
+
+=== MORI SYSTEMD UNITS ===
+mori-integrity.service                       enabled         enabled
+
+=== MORI V2.7 HASH ===
+7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039  /home/researcher/mori-v2/mori_observer.v2.7

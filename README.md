@@ -1,6 +1,6 @@
 # Copy Fail Lab
 
-> Controlled reproduction, detection, behavioral correlation, and mitigation of **CVE-2026-31431 (Copy Fail)** in an isolated Linux kernel research environment.
+> Controlled reproduction, detection, behavioral correlation, compensating control development, and vendor-patch validation for **CVE-2026-31431 (Copy Fail)** in an isolated Linux kernel research environment.
 
 <p align="center">
 
@@ -8,8 +8,8 @@
 ![Linux](https://img.shields.io/badge/Linux-Kernel%20Research-9d4dff?style=flat-square&logo=linux&logoColor=white)
 ![Proxmox](https://img.shields.io/badge/Proxmox-VE-E57000?style=flat-square&logo=proxmox&logoColor=white)
 ![Detection](https://img.shields.io/badge/Detection-MORI-9d4dff?style=flat-square)
-![Mitigation](https://img.shields.io/badge/MORI-v2.6.2-9d4dff?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Vendor%20Patch%20Validation-9d4dff?style=flat-square)
+![Mitigation](https://img.shields.io/badge/MORI-v2.7-9d4dff?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Final%20Report-9d4dff?style=flat-square)
 
 </p>
 
@@ -17,18 +17,13 @@
 
 ## Overview
 
-This repository documents a controlled security research project investigating
-**CVE-2026-31431**, commonly referred to as **Copy Fail**.
+This repository documents a controlled security research project investigating **CVE-2026-31431**, commonly referred to as **Copy Fail**.
 
-The vulnerability affects the Linux kernel and can be abused by an
-unprivileged local user to modify page-cache-visible data associated with a
-privileged executable, ultimately resulting in local privilege escalation.
+The vulnerability affects the Linux kernel and can be abused by an unprivileged local user to modify page-cache-visible data associated with a privileged executable, ultimately resulting in local privilege escalation.
 
-The objective of this project is not simply to execute a public proof of
-concept.
+The objective of this project is not simply to execute a public proof of concept.
 
-Instead, the laboratory follows the vulnerability through a complete
-defensive lifecycle:
+Instead, the laboratory follows the vulnerability through a complete defensive lifecycle:
 
 ```text
 research
@@ -55,14 +50,20 @@ shadow policy
    ↓
 selective enforcement
    ↓
+MORI regression testing
+   ↓
+MORI v2.7 lifecycle fix
+   ↓
 vendor remediation
    ↓
-final retest
+independent patched-kernel retest
+   ↓
+evidence freeze
+   ↓
+final report / presentation
 ```
 
-Every phase is documented with command output, screenshots, cryptographic
-hashes, configuration files, preserved implementation checkpoints, and
-reproducible evidence.
+Every phase is documented with command output, screenshots, cryptographic hashes, configuration files, implementation checkpoints, and reproducible evidence.
 
 ---
 
@@ -85,8 +86,12 @@ reproducible evidence.
 - Introduce shadow enforcement before active denial
 - Enforce the selected behavior using BPF LSM
 - Add structured deny telemetry
+- Regression-test the compensating control
+- Correct the discovered MORI correlation-lifecycle weakness
 - Apply the vendor remediation
-- Repeat the experiment against the patched system
+- Repeat the experiment against the patched system with MORI isolated
+- Verify benign AF_ALG functionality remains available
+- Preserve and verify the final evidence packages
 - Produce a reproducible technical report and presentation
 
 ---
@@ -108,8 +113,9 @@ reproducible evidence.
 ████████████████████  MORI v2 Shadow Policy
 ████████████████████  MORI v2 Selective Enforcement
 ████████████████████  Structured Deny Telemetry
-░░░░░░░░░░░░░░░░░░░░  Vendor Patch Validation
-░░░░░░░░░░░░░░░░░░░░  Final Retest
+████████████████████  MORI v2.7 Regression Fix
+████████████████████  Vendor Patch Validation
+████████████████████  Final Retest
 ░░░░░░░░░░░░░░░░░░░░  Final Report / Presentation
 ```
 
@@ -117,24 +123,24 @@ reproducible evidence.
 
 # Lab Environment
 
-The experiment is performed inside an isolated Proxmox laboratory behind an
-OPNsense firewall.
+The experiment is performed inside an isolated Proxmox laboratory behind an OPNsense firewall.
 
 | Component | Configuration |
-|-----------|---------------|
+|---|---|
 | Hypervisor | Proxmox VE |
 | Guest OS | Ubuntu Server 24.04 LTS |
 | Virtualization | KVM / QEMU |
 | Reference System | Patched Ubuntu reference VM |
 | Vulnerable System | `copyfail-vuln` |
 | Vulnerable Kernel | `6.8.0-116-generic` |
+| Vendor-patched validation kernel | `6.8.0-137-generic` |
+| Vendor kernel package version | `6.8.0-137.137` |
 | Unprivileged Test User | `labuser` |
 | Research / Administration User | `researcher` |
 | Network | Isolated OPNsense laboratory |
 | Snapshots | Used before destructive or state-changing phases |
 
-A dedicated snapshot preserves the validated vulnerable system before vendor
-remediation:
+A dedicated snapshot preserves the validated vulnerable system before vendor remediation:
 
 ```text
 pre-vendor-patch-mori-guard
@@ -144,11 +150,9 @@ pre-vendor-patch-mori-guard
 
 # Vulnerability Reproduction
 
-The vulnerable system was reconstructed using the historical Ubuntu
-`6.8.0-116-generic` kernel.
+The vulnerable system was reconstructed using the historical Ubuntu `6.8.0-116-generic` kernel.
 
-The public Copy Fail proof of concept was executed as the deliberately
-unprivileged `labuser`.
+The public Copy Fail proof of concept was executed as the deliberately unprivileged `labuser`.
 
 Before exploitation:
 
@@ -170,23 +174,19 @@ uid=0(root)
 
 while the VFS-visible representation of `/usr/bin/su` changed.
 
-A direct read of the backing ext4 filesystem continued to return the original
-file hash, demonstrating that the observed modification was not equivalent to
-a conventional persistent file write.
+A direct read of the backing ext4 filesystem continued to return the original file hash, demonstrating that the observed modification was not equivalent to a conventional persistent file write.
 
 Rebooting the vulnerable system restored the original VFS-visible file state.
 
 The experiment deliberately stopped after proving local privilege escalation.
 
-No persistence, credential theft, reverse shell, lateral movement, or unrelated
-post-exploitation activity was performed.
+No persistence, credential theft, reverse shell, lateral movement, or unrelated post-exploitation activity was performed.
 
 ---
 
 # MORI Monitor
 
-To investigate defensive visibility, the project introduces **MORI Monitor**,
-an integrity watcher for privileged executables.
+To investigate defensive visibility, the project introduces **MORI Monitor**, an integrity watcher for privileged executables.
 
 ```text
  /\_/\
@@ -194,12 +194,9 @@ an integrity watcher for privileged executables.
  > ^ <
 ```
 
-MORI maintains a protected known-good SHA-256 baseline for accessible
-root-owned SUID executables and periodically compares their current
-VFS-visible contents against that baseline.
+MORI maintains a protected known-good SHA-256 baseline for accessible root-owned SUID executables and periodically compares their current VFS-visible contents against that baseline.
 
-During a successful Copy Fail attempt, MORI observed the modification of
-`/usr/bin/su`:
+During a successful Copy Fail attempt, MORI observed the modification of `/usr/bin/su`:
 
 ```text
  /\_/\
@@ -222,11 +219,9 @@ It does not prevent the vulnerability from being exploited.
 
 # YARA Comparison
 
-A small YARA experiment was added to contrast exact-sample identification with
-integrity-based detection.
+A small YARA experiment was added to contrast exact-sample identification with integrity-based detection.
 
-An exact-hash YARA rule successfully identified the known laboratory copy of
-the Copy Fail proof of concept.
+An exact-hash YARA rule successfully identified the known laboratory copy of the Copy Fail proof of concept.
 
 Original sample:
 
@@ -256,8 +251,7 @@ The exact-hash YARA rule no longer matched.
 
 This does **not** demonstrate a limitation of YARA as a whole.
 
-YARA can use strings, byte patterns, structural properties, and generalized
-conditions.
+YARA can use strings, byte patterns, structural properties, and generalized conditions.
 
 The experiment instead demonstrates the difference between:
 
@@ -273,9 +267,7 @@ security-relevant effect detection
 
 The first custom compensating control is **MORI Guard v1**.
 
-It prevents the vulnerable `algif_aead` kernel interface from being loaded
-through normal `modprobe` resolution while the vulnerable kernel is
-intentionally retained for laboratory testing.
+It prevents the vulnerable `algif_aead` kernel interface from being loaded through normal `modprobe` resolution while the vulnerable kernel is intentionally retained for laboratory testing.
 
 ```text
             ⁺‧₊˚ ཐི⋆♱⋆ཋྀ ˚₊‧⁺
@@ -312,18 +304,15 @@ privilege escalation: none
 MORI integrity alert: none
 ```
 
-The same proof of concept that previously produced a root shell was therefore
-unable to complete its exploitation chain.
+The same proof of concept that previously produced a root shell was therefore unable to complete its exploitation chain.
 
-MORI Guard v1 is explicitly treated as a **compensating control**, not as a fix
-for the underlying kernel defect.
+MORI Guard v1 is explicitly treated as a **compensating control**, not as a fix for the underlying kernel defect.
 
 ---
 
 ## MORI Guard v1 Compatibility Impact
 
-Blocking `algif_aead` also prevents legitimate applications from using that
-kernel interface.
+Blocking `algif_aead` also prevents legitimate applications from using that kernel interface.
 
 A benign unprivileged AF_ALG AEAD bind was tested while MORI Guard v1 was active.
 
@@ -347,8 +336,7 @@ The negative compatibility result motivated development of MORI v2.
 
 # MORI v2
 
-**MORI v2** explores whether Copy Fail-relevant behavior can be observed,
-correlated, and selectively denied without disabling AF_ALG AEAD entirely.
+**MORI v2** explores whether Copy Fail-relevant behavior can be observed, correlated, and selectively denied without disabling AF_ALG AEAD entirely.
 
 The implementation combines:
 
@@ -364,18 +352,17 @@ userspace trust validation
 ring-buffer telemetry
 ```
 
-The final research build is:
+The current validated research build is:
 
 ```text
-MORI v2.6.2
+MORI v2.7
 ```
 
 ---
 
 ## From False Positive to Selective Control
 
-The first MORI v2 observer monitored non-root reads of root-owned SUID
-executables.
+The first MORI v2 observer monitored non-root reads of root-owned SUID executables.
 
 It immediately discovered a false positive:
 
@@ -392,8 +379,7 @@ MORI v2 alert
 
 MORI had, effectively, detected herself.
 
-Instead of suppressing the event using a hard-coded PID, UID, or process name,
-the trust model was developed incrementally.
+Instead of suppressing the event using a hard-coded PID, UID, or process name, the trust model was developed incrementally.
 
 The final monitor exemption verifies:
 
@@ -411,7 +397,7 @@ If trust verification fails, MORI still attaches but leaves the trust map empty.
 
 # MORI v2 Behavioral Signals
 
-The final research control correlates several independently observable signals.
+The research control correlates several independently observable signals.
 
 ## AF_ALG AEAD Activity
 
@@ -433,8 +419,7 @@ Benign unprivileged:
 gcm(aes)
 ```
 
-use was confirmed to remain functional when MORI Guard v1 was disabled and
-MORI v2 was operating.
+use was confirmed to remain functional when MORI Guard v1 was disabled and MORI v2 was operating.
 
 ## SUID-to-Pipe Splice Activity
 
@@ -481,20 +466,19 @@ lsm/socket_bind
 fentry/do_splice
         |
         v
-  splice_state
+ splice_state
 
 
-        both
-         |
-         v
+       both
+        |
+        v
 lsm/file_permission
-         |
-         v
+        |
+        v
  correlation decision
 ```
 
-Testing demonstrated that state written by the `fentry/do_splice` program was
-visible to the `file_permission` LSM hook during the same splice operation.
+Testing demonstrated that state written by the `fentry/do_splice` program was visible to the `file_permission` LSM hook during the same splice operation.
 
 A controlled combined test produced:
 
@@ -510,8 +494,7 @@ while the individual benign operations still succeeded.
 
 # MORI v2 Shadow Policy
 
-Before enabling active enforcement, the combined policy was operated in
-shadow mode.
+Before enabling active enforcement, the combined policy was operated in shadow mode.
 
 A matching event produced:
 
@@ -626,10 +609,9 @@ splice=blocked errno=1
 
 # Judgment Cat
 
-MORI v2.6.2 adds an optional attacker-facing notification layer.
+MORI v2.6.2 added an optional attacker-facing notification layer.
 
-When a deny event is received, MORI attempts to locate an interactive terminal
-for the originating process through:
+When a deny event is received, MORI attempts to locate an interactive terminal for the originating process through:
 
 ```text
 /proc/<tgid>/fd/
@@ -647,7 +629,7 @@ If no interactive terminal exists, notification is skipped.
 
 Notification failure does not change enforcement.
 
-The final message is:
+The message is:
 
 ```text
  /\_/\
@@ -662,6 +644,37 @@ MORI: I'm disappointed in you.
 The ASCII cat is presentation.
 
 The actual security mechanism remains the BPF LSM `EPERM` decision.
+
+---
+
+# MORI v2.7 Lifecycle Regression Fix
+
+Additional regression testing of v2.6.2 identified a same-TGID timing/lifecycle weakness in the experimental correlation model.
+
+The test sequence demonstrated that correlation state could expire before the later protected operation in the tested delayed sequence.
+
+The issue was retained as evidence rather than hidden, and a v2.7 lifecycle correction was developed and regression-tested.
+
+The final v2.7 validation demonstrated:
+
+```text
+cross-TGID activity
+    -> remains isolated
+
+tested same-TGID expiry sequence
+    -> no longer bypasses the selected enforcement path
+
+final Python CopyFail PoC
+    -> denied
+
+independent C CopyFail PoC
+    -> denied
+
+post-test privileged target validation
+    -> clean
+```
+
+The final v2.7 source and build artifacts were frozen and independently hashed after validation.
 
 ---
 
@@ -709,6 +722,12 @@ structured ring-buffer telemetry
         v
 v2.6.2
 attacker-facing TTY notification
+        |
+        v
+v2.7
+correlation lifecycle regression fix
+final Python + independent C validation
+artifact freeze + provenance
 ```
 
 ---
@@ -719,19 +738,77 @@ MORI v2 remains an experimental research control.
 
 Important limitations include:
 
-- correlation windows are experimental
-- AEAD state is currently keyed by TGID
-- splice state is currently keyed by TGID
+- correlation windows and lifecycle rules are specific to the tested research design
+- AEAD state is keyed at process/TGID scope
+- splice state is keyed at process/TGID scope
 - process-level correlation does not establish precise thread-level causality
 - `socket_bind` observes an AEAD bind attempt before successful completion is independently known
 - SUID-to-pipe splice activity is not inherently malicious
 - legitimate software reproducing the same correlated sequence may be denied
 - the control was designed around the behavior investigated in this Copy Fail laboratory
+- the validation scope is limited to the tested environment and PoC implementations
 
-MORI v2 is therefore not presented as a universal Linux exploit-prevention
-system.
+MORI v2 is therefore not presented as a universal Linux exploit-prevention system.
 
 The vendor kernel remediation remains the preferred fix.
+
+---
+
+# Phase 05 — Vendor Patch Validation
+
+After MORI v2.7 validation was completed, the laboratory moved to the vendor-remediated kernel.
+
+The purpose of Phase 05 was to answer a separate question:
+
+> Does the vendor-remediated kernel prevent the previously reproduced Copy Fail behavior without relying on MORI, while preserving the benign AF_ALG functionality exercised by the laboratory?
+
+The patched validation environment used:
+
+```text
+Linux:   6.8.0-137-generic
+Package: linux-image-6.8.0-137-generic
+Version: 6.8.0-137.137
+```
+
+Before active retesting, MORI was explicitly isolated from the enforcement path.
+
+Validation confirmed:
+
+```text
+MORI process:           absent
+MORI integrity service: inactive
+MORI BPF pins:          absent
+```
+
+Benign AF_ALG AEAD functionality remained operational:
+
+```text
+socket(AF_ALG):                 PASS
+bind(("aead", "gcm(aes)")):     PASS
+accept():                       PASS
+```
+
+The Python Copy Fail PoC and an independently compiled C implementation were then tested against the patched kernel.
+
+For both tested implementations:
+
+```text
+unauthorized privilege transition: not observed
+/usr/bin/su integrity:              preserved
+normal su authentication:           preserved
+```
+
+The baseline and final SHA-256 of `/usr/bin/su` matched:
+
+```text
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+```
+
+The Phase 05 evidence package contains 5 machine-readable text artifacts and 13 screenshots. All 18 evidence objects were verified against `PUBLIC-SHA256SUMS.txt`.
+
+See:
+
+[`evidence/05-vendor-patch-validation/README.md`](evidence/05-vendor-patch-validation/README.md)
 
 ---
 
@@ -751,18 +828,33 @@ copy-fail-lab/
 │   │   └── yara-comparison/
 │   │
 │   ├── 04-custom-mitigation/
-│   │   ├── artifacts/             # MORI Guard v1
-│   │   ├── screenshots/           # MORI Guard v1
+│   │   ├── artifacts/                  # MORI Guard v1
+│   │   ├── screenshots/                # MORI Guard v1 + final v2.7 validation evidence
 │   │   └── mori-v2/
 │   │       ├── artifacts/
 │   │       │   ├── checkpoints/
-│   │       │   └── final/
+│   │       │   │   ├── v2.2.0/
+│   │       │   │   ├── v2.3.0/
+│   │       │   │   ├── v2.4-splice-probe/
+│   │       │   │   ├── v2.4.0/
+│   │       │   │   ├── v2.5.0/
+│   │       │   │   ├── v2.6.0/
+│   │       │   │   ├── v2.6.1/
+│   │       │   │   └── v2.6.2/
+│   │       │   └── current/
+│   │       │       ├── build/
+│   │       │       ├── source/
+│   │       │       ├── PROVENANCE.txt
+│   │       │       └── PROVENANCE.sha256
 │   │       ├── screenshots/
 │   │       ├── PUBLIC-SHA256SUMS.txt
 │   │       └── README.md
 │   │
-│   ├── 05-patched/                # upcoming
-│   └── 06-final-retest/           # upcoming
+│   └── 05-vendor-patch-validation/
+│       ├── artifacts/
+│       ├── screenshots/
+│       ├── PUBLIC-SHA256SUMS.txt
+│       └── README.md
 │
 ├── report/
 │   ├── main.tex
@@ -782,15 +874,7 @@ copy-fail-lab/
 
 # MORI v2 Evidence Package
 
-The MORI v2 research package contains:
-
-```text
-Artifacts:   45
-Screenshots: 40
-Total:       85
-```
-
-Historical full implementation checkpoints are preserved for:
+The MORI v2 package preserves historical implementation checkpoints for:
 
 ```text
 v2.2.0
@@ -803,18 +887,52 @@ v2.6.1
 v2.6.2
 ```
 
-The final v2.6.2 implementation is additionally preserved under:
+The currently validated MORI v2.7 implementation is preserved under:
 
 ```text
-evidence/04-custom-mitigation/mori-v2/artifacts/final/
+evidence/04-custom-mitigation/mori-v2/artifacts/current/
 ```
 
-The associated SHA-256 manifest was independently verified:
+The current package separates:
 
 ```text
-Verified: 85
-Failed:   0
+source/
+build/
+PROVENANCE.txt
+PROVENANCE.sha256
 ```
+
+The tested v2.7 executable is:
+
+```text
+mori_observer.v2.7
+```
+
+with SHA-256:
+
+```text
+7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039
+```
+
+The provenance record itself was independently verified after transfer into the repository.
+
+---
+
+# Phase 05 Evidence Package
+
+The vendor-patch validation package contains:
+
+```text
+Raw text artifacts:  5
+Screenshots:        13
+Total evidence:     18
+```
+
+The evidence manifest covers the raw artifacts and screenshots while intentionally excluding the editable README.
+
+The complete package is documented at:
+
+[`evidence/05-vendor-patch-validation/`](evidence/05-vendor-patch-validation/)
 
 ---
 
@@ -840,11 +958,9 @@ verify manifest
 commit
 ```
 
-Public evidence is reviewed for infrastructure-specific or sensitive
-information before publication.
+Public evidence is reviewed for infrastructure-specific or sensitive information before publication.
 
-Exact internal network addressing, machine identifiers, credentials, tokens,
-and other unnecessary environmental details are not intentionally published.
+Exact internal network addressing, machine identifiers, credentials, tokens, and other unnecessary environmental details are not intentionally published.
 
 The proof-of-concept itself is also not redistributed in this repository.
 
@@ -875,12 +991,12 @@ The project deliberately preserves:
 - compatibility failures
 - negative controls
 - intermediate implementation checkpoints
+- discovered weaknesses in the custom control
+- regression tests for subsequent fixes
 
 rather than only publishing successful final results.
 
-Observed behavior is documented directly, while explanations that depend on
-kernel implementation details are validated against upstream or vendor
-sources before being treated as conclusions.
+Observed behavior is documented directly, while explanations that depend on kernel implementation details are validated against upstream or vendor sources before being treated as conclusions.
 
 ---
 
@@ -889,14 +1005,32 @@ sources before being treated as conclusions.
 The project deliberately distinguishes between several defensive mechanisms.
 
 | Layer | Purpose |
-|------|---------|
+|---|---|
 | YARA exact-sample rule | Identify the known laboratory artifact |
 | MORI Monitor | Detect integrity changes to privileged targets |
 | MORI Guard v1 | Broadly restrict access to the tested vulnerable interface |
-| MORI v2 | Correlate Copy Fail-relevant behavior and selectively deny the tested combination |
-| Vendor kernel update | Correct the underlying vulnerability |
+| MORI v2.7 | Correlate Copy Fail-relevant behavior and selectively deny the tested combination |
+| Vendor kernel update | Correct the underlying vulnerability in the validated long-term remediation path |
 
 These mechanisms are complementary rather than interchangeable.
+
+The final laboratory progression is:
+
+```text
+detect
+  ↓
+broadly mitigate
+  ↓
+measure compatibility cost
+  ↓
+build selective compensating control
+  ↓
+regression-test the control
+  ↓
+apply vendor remediation
+  ↓
+validate patched behavior independently
+```
 
 ---
 
@@ -920,6 +1054,8 @@ This project focuses on practical understanding of:
 - fentry tracing
 - cross-program BPF state
 - behavioral correlation
+- temporal state and lifecycle design
+- regression testing
 - shadow enforcement
 - compensating controls
 - compatibility testing
@@ -929,8 +1065,7 @@ This project focuses on practical understanding of:
 - evidence preservation
 - reproducible technical documentation
 
-The goal is to understand the vulnerability and its defensive implications
-rather than treating a public exploit as a black box.
+The goal is to understand the vulnerability and its defensive implications rather than treating a public exploit as a black box.
 
 ---
 
@@ -940,14 +1075,12 @@ All experiments are performed:
 
 - inside an isolated virtual laboratory
 - against systems owned and controlled by the author
-- using a deliberately created unprivileged test account
+- using deliberately created unprivileged test accounts
 - exclusively for security research and educational purposes
 
-Privilege escalation is considered proven once the controlled test user
-obtains root identity.
+Privilege escalation is considered proven once the controlled test user obtains root identity.
 
-No persistence, credential harvesting, lateral movement, reverse shells, or
-unauthorized targets are involved.
+No persistence, credential harvesting, lateral movement, reverse shells, or unauthorized targets are involved.
 
 ---
 
@@ -989,36 +1122,42 @@ Completed:
 ✓ structured ring-buffer telemetry
 ✓ attacker-facing TTY notification
 
-✓ MORI v2.6.2 evidence package
-✓ 85/85 evidence manifest verification
+✓ MORI v2.6.2 regression validation
+✓ same-TGID expiry weakness reproduced
+✓ MORI v2.7 lifecycle correction
+✓ cross-TGID isolation validation
+✓ final Python PoC denied under MORI v2.7
+✓ independent C PoC denied under MORI v2.7
+✓ MORI v2.7 source/build artifacts frozen
+✓ MORI v2.7 provenance verified
+
+✓ vendor-patched kernel identified
+✓ MORI isolated from vendor-patch validation
+✓ benign AF_ALG AEAD control passed
+✓ Python Copy Fail retest failed to reproduce privilege escalation
+✓ independent C Copy Fail retest failed to reproduce privilege escalation
+✓ final /usr/bin/su integrity preserved
+✓ Phase 05 evidence package verified 18/18
 ```
 
 Current phase:
 
 ```text
-→ vendor remediation / patched-kernel validation
+→ final technical report
 ```
 
 Next:
 
 ```text
-vendor-patched kernel
-        ↓
-repeat controlled test
-        ↓
-compare vulnerable / v1 / v2 / patched behavior
-        ↓
-final retest
-        ↓
 final report
-        ↓
+      ↓
 technical presentation
+      ↓
+publication-ready repository review
 ```
 
 ---
 
 # Related Work
 
-This laboratory forms part of a broader security research and home-lab
-environment and is being developed as the practical component of a
-cybersecurity final project.
+This laboratory forms part of a broader security research and home-lab environment and is being developed as the practical component of a cybersecurity final project.

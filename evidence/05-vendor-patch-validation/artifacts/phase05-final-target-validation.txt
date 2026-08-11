@@ -1,0 +1,20 @@
+=== PHASE 05 FINAL TARGET VALIDATION ===
+2026-08-11T21:59:37+00:00
+
+=== CURRENT USER ===
+uid=1000(researcher) gid=1000(researcher) groups=1000(researcher),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),101(lxd)
+
+=== SUID TARGET ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+  File: /usr/bin/su
+  Size: 55680     	Blocks: 112        IO Block: 4096   regular file
+Device: 252,0	Inode: 164384      Links: 1
+Access: (4755/-rwsr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2026-08-11 08:39:53.951402557 +0000
+Modify: 2026-03-06 16:00:54.000000000 +0000
+Change: 2026-08-04 17:54:29.735314117 +0000
+ Birth: 2026-08-04 17:54:29.683313065 +0000
+-rwsr-xr-x 1 root root 55680 Mar  6 16:00 /usr/bin/su
+
+=== EXPECTED BASELINE SHA256 ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su

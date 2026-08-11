@@ -1,0 +1,15 @@
+=== PHASE 05 INDEPENDENT C POC PROVENANCE ===
+2026-08-11T21:59:22+00:00
+
+=== SOURCE ===
+realpath: /home/labuser/copyfail-c-test/exploit.c: Permission denied
+ls: cannot access '/home/labuser/copyfail-c-test/exploit.c': Permission denied
+sha256sum: /home/labuser/copyfail-c-test/exploit.c: Permission denied
+
+=== BINARY ===
+realpath: /home/labuser/copyfail-c-test/copyfail-c: Permission denied
+ls: cannot access '/home/labuser/copyfail-c-test/copyfail-c': Permission denied
+sha256sum: /home/labuser/copyfail-c-test/copyfail-c: Permission denied
+
+=== COMPILER ===
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0

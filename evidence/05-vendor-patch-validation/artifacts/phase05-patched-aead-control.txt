@@ -1,0 +1,21 @@
+=== PHASE 05 PATCHED AF_ALG BENIGN CONTROL ===
+
+=== KERNEL ===
+6.8.0-137-generic
+
+=== TEST USER ===
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+
+=== AF_ALG AEAD CONTROL ===
+uid=1001 gid=1001
+socket(AF_ALG): OK
+bind(("aead", "gcm(aes)")): OK
+accept(): OK
+benign AF_ALG AEAD lifecycle: PASS
+
+=== MODULE STATE AFTER CONTROL ===
+algif_aead             12288  0
+af_alg                 32768  1 algif_aead
+
+=== SUID TARGET INTEGRITY ===
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
