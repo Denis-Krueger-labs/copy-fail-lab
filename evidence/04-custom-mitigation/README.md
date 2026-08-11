@@ -1,4 +1,4 @@
-﻿# 04 — Custom Mitigation: MORI
+# 04 — Custom Mitigation: MORI
 
 This evidence set documents the development, regression testing, and final
 validation of MORI, an eBPF-based compensating control developed for the
@@ -10,7 +10,7 @@ The final tested candidate is MORI v2.7.
 
 Frozen executable:
 
-`artifacts/mori-v2.7/build/mori_observer.v2.7`
+`mori-v2/artifacts/current/build/mori_observer.v2.7`
 
 SHA-256:
 
@@ -32,7 +32,7 @@ independent C PoC test.
 
 The original Linux-generated artifact manifest is preserved at:
 
-`artifacts/mori-v2.7/SHA256SUMS.txt`
+`mori-v2/artifacts/current/SHA256SUMS.txt`
 
 The transferred Windows repository copy was independently checked against that
 manifest and all entries verified successfully.

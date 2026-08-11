@@ -1,4 +1,4 @@
-﻿# MORI v2 — Correlated eBPF/LSM Compensating Control
+# MORI v2 — Correlated eBPF/LSM Compensating Control
 
 MORI v2 is the second-generation experimental compensating control developed during the Copy Fail research lab.
 
@@ -294,7 +294,24 @@ Historical full implementation checkpoints are preserved for:
 - v2.6.1
 - v2.6.2
 
-The final v2.6.2 build is also preserved separately under `artifacts/final/`.
+## Current validated release
+
+**MORI v2.7**
+
+The `artifacts/current/` directory contains the frozen MORI v2.7 build used
+for the final regression and adversarial validation of the custom mitigation.
+
+Current executable:
+
+`artifacts/current/build/mori_observer.v2.7`
+
+SHA-256:
+
+`7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039`
+
+Historical MORI v2.6.2 remains preserved under:
+
+`artifacts/checkpoints/v2.6.2/`
 
 Earlier v2.1.x development is represented through the preserved screenshot and hash evidence rather than complete checkpoint directories.
 
