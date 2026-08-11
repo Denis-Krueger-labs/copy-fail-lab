@@ -1,301 +1,163 @@
-﻿# Custom Mitigation Evidence
+﻿# 04 — Custom Mitigation: MORI
 
-This directory contains evidence for the custom compensating control tested
-against CVE-2026-31431 ("Copy Fail").
+This evidence set documents the development, regression testing, and final
+validation of MORI, an eBPF-based compensating control developed for the
+CopyFail laboratory environment.
 
-## Objective
+The final tested candidate is MORI v2.7.
 
-The mitigation experiment tests whether access to the vulnerable
-`algif_aead` kernel interface can be prevented while deliberately retaining
-the vulnerable `6.8.0-116-generic` kernel.
+## Final Candidate
 
-The control does not patch the underlying kernel vulnerability. Instead, it
-uses a `modprobe` install override to prevent `algif_aead` from being loaded.
+Frozen executable:
 
-## MORI Guard
+`artifacts/mori-v2.7/build/mori_observer.v2.7`
 
-The control consists of:
+SHA-256:
 
-- `/etc/modprobe.d/mori-copyfail-guard.conf`
-- `/usr/local/sbin/mori-block-algif-aead`
+`7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039`
 
-Requests to load `algif_aead` are redirected to the MORI Guard blocker.
+The final candidate was not rebuilt between the final Python PoC test and the
+independent C PoC test.
 
-The blocker records the denied request in the system journal and returns a
-failure status.
+## Frozen v2.7 Artifacts
 
-The tested blocker also produces a deliberately visible denial message:
+| Artifact | SHA-256 |
+|---|---|
+| `source/mori_observer.bpf.c` | `05e0a387ce084d2aef121351c9af7907f85696307d9f08ccdf6d9191f91a035d` |
+| `build/mori_observer.bpf.o` | `b3723e4f9815611512696a2ccd5516e37450490453063e05f644ce0a4e70f5a7` |
+| `source/mori_observer.c` | `2ee01194b488e757dd4c1062a4123aec8aac5c5cbd74767ebc3a938f886939e6` |
+| `build/mori_observer.skel.h` | `5cd82d2cc061e6b5fdbf2d59c563ebcdaa54e5dae3a97f0ff0dda6fd0200fd73` |
+| `build/mori_observer.v2.7` | `7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039` |
+| `build/vmlinux.h` | `9afb58909604112dc7a303acef1e12ccd1edd6e3a066bb81fef69278a267af9a` |
 
-```text
-            ⁺‧₊˚ ཐི⋆♱⋆ཋྀ ˚₊‧⁺
+The original Linux-generated artifact manifest is preserved at:
 
- /\_/\
-( Ò.Ó )   MORI GUARD
- > ^ <
+`artifacts/mori-v2.7/SHA256SUMS.txt`
 
-One of my trusted moths has informed me
-that you are touching my binaries.
+The transferred Windows repository copy was independently checked against that
+manifest and all entries verified successfully.
 
-I do not share my binaries.
-They are mine.
+## Final Validation Summary
 
-Begone.
-You are scaring the moths.
-```
+MORI v2.7 was tested against two independently implemented CopyFail test cases.
 
-The message is cosmetic. The actual control decision is the failed
-`algif_aead` module-load request.
+### Python PoC
 
-## Test Result
+Observed MORI lifecycle:
 
-The same Copy Fail proof of concept that previously produced a root shell was
-executed again as the unprivileged `labuser`.
-
-During the mitigated test:
-
-- the system remained on kernel `6.8.0-116-generic`;
-- `algif_aead` was not loaded;
-- the proof of concept terminated with an error;
-- `labuser` remained unprivileged;
-- `/usr/bin/su` retained its known-good SHA-256 value;
-- MORI Guard recorded the denied module-load request; and
-- MORI Monitor recorded no integrity violation during the blocked attempt.
-
-The protected target retained the known-good SHA-256 value:
-
-```text
-c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
-```
-
-The proof of concept failed before privilege escalation could occur.
-
-This demonstrates that the compensating control interrupted the tested
-exploit chain before the privileged executable was modified.
-
-## Control Boundary
-
-MORI Guard, in this initial implementation, blocks the availability of the
-`algif_aead` interface through normal `modprobe` resolution.
-
-Its purpose is therefore narrower than replacing the vulnerable kernel, but
-broader than recognizing one particular exploit sample.
-
-The tested control does not depend on:
-
-- the proof-of-concept filename;
-- the proof-of-concept SHA-256 value;
-- the exploit source code; or
-- the specific `/usr/bin/su` payload used during reproduction.
-
-Instead, it removes one kernel interface required by the tested Copy Fail
-exploit chain.
-
-However, this also means the control cannot distinguish malicious use of that
-interface from legitimate use.
-
-## Compatibility Impact
-
-A benign unprivileged AF_ALG AEAD bind was tested while MORI Guard was active.
-
-The benign test attempted to bind:
-
-```text
-AF_ALG
-type: aead
-algorithm: gcm(aes)
-```
+- AEAD activity observed
+- AF_ALG accept observed
+- splice state armed
+- SUID-target correlation reached
+- dangerous splice denied
+- splice state disarmed
+- AEAD state released
+- attacker-facing notification delivered
 
 Result:
 
-```text
-EXPECTED: benign AEAD bind failed while MORI Guard is active
-exception=FileNotFoundError
-errno=2
-message=No such file or directory
-```
+- exploit operation returned `EPERM`
+- `/usr/bin/su` remained byte-identical to baseline
+- `labuser` remained UID 1001
+- privilege escalation failed
 
-The benign operation therefore failed as well.
+### Independent C PoC
 
-This demonstrates an important limitation of the initial control:
-MORI Guard does not distinguish malicious Copy Fail activity from legitimate
-applications that require the `algif_aead` interface.
+Repository commit:
 
-The practical tradeoff is:
+`ba3f503b1497350a2df3a89fab0427b4f868fe59`
 
-```text
-reduced attack surface
-        ↕
-reduced functionality
-```
+Source SHA-256:
 
-## Experimental Limitation and Follow-Up
+`e1dec1348c0d43ab47d8f992d9a0336216fd37ff83e6fa1d9e39a80890fbd165`
 
-The initial MORI Guard implementation successfully interrupted the tested
-Copy Fail exploitation chain.
+Binary SHA-256:
 
-However, the compatibility test also produced a valuable negative result:
-the control blocked benign AF_ALG AEAD functionality.
+`3b2605dc5e820f40645f682385194469f9189cbb65ee99153b52aedf45be5706`
 
-The initial implementation therefore did **not** provide selective mitigation.
+Observed MORI lifecycle:
 
-Functionally, its security effect is comparable to disabling the affected
-kernel module, while adding explicit denial logging and experimental
-visibility.
+- AEAD activity observed
+- AF_ALG accept observed
+- splice state armed
+- SUID-target correlation reached
+- `DENY-AEAD-SPLICE-SUID` emitted
+- splice state disarmed
+- AEAD state released
 
-In simplified form:
+Result:
 
-```text
-MORI Guard v1
-    |
-    +-- exploit-related AEAD use --> DENY
-    |
-    `-- benign AEAD use ----------> DENY
-                                      ^
-                                      |
-                                   too broad
-```
+- C PoC failed on its first attempted write
+- `/usr/bin/su` remained byte-identical to baseline
+- `labuser` remained UID 1001
+- privilege escalation failed
 
-This result is retained as part of the experiment rather than hidden as an
-implementation failure.
+## Regression Testing
 
-It motivates a second, more selective MORI Guard design.
+The final candidate was also tested for control correctness rather than only
+attack blocking.
 
-The follow-up question becomes:
+The regression suite covered:
 
-> Can the exploit-relevant behavior be blocked while legitimate AF_ALG AEAD
-> functionality remains available?
+- ordinary socket activity not producing false AEAD accept telemetry
+- tracked AF_ALG AEAD bind/accept lifecycle remaining observable
+- cross-TGID isolation
+- same-TGID state expiry behavior
+- expiry-bypass regression
+- alternate SUID targets
+- multi-target SUID sweep
+- post-test target integrity
 
-A successful follow-up control should therefore satisfy both conditions:
+Earlier v2.6.2 and intermediate v2.7 screenshots are intentionally retained.
+They document discovered false positives and lifecycle defects as well as the
+subsequent corrections.
 
-```text
-benign AEAD operation
-        |
-        `--> ALLOW
+## Screenshot Index
 
-exploit-relevant behavior chain
-        |
-        `--> DENY
-```
+| ID | Evidence |
+|---|---|
+| 39 | MORI v2.6.2 pre-PoC validation |
+| 40 | v2.6.2 active before real Python PoC |
+| 41 | real Python CopyFail PoC blocked |
+| 42 | post-PoC integrity validation |
+| 43 | independent C PoC pre-test state |
+| 44 | independent C PoC denied |
+| 45 | C PoC post-test validation |
+| 46 | alternate SUID target baseline (`fusermount3`) |
+| 47 | SUID-target sweep denial |
+| 48 | post-sweep integrity, 10/10 targets unchanged |
+| 49 | cross-TGID isolation, unrelated splice allowed |
+| 50 | same-TGID expiry bypass reproduced |
+| 51 | intermediate v2.7 lifecycle regression, splice still allowed |
+| 52 | v2.7 expiry-bypass regression fixed |
+| 53 | frozen v2.7 Python PoC denial |
+| 54 | frozen v2.7 Python post-test validation |
+| 55 | frozen v2.7 independent C PoC denial and post-validation |
+| 56 | independent C PoC provenance |
 
-The second design is evaluated separately so that the evidence for this
-initial broad control remains historically intact.
+## Target Integrity
 
-## Relationship to MORI Monitor
+Known-good `/usr/bin/su` SHA-256 used during final validation:
 
-MORI Guard and MORI Monitor serve different purposes.
+`c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b`
 
-MORI Monitor detects the consequence observed during successful exploitation:
+The same digest was observed after both final PoC executions.
 
-```text
-privileged executable changes
-        |
-        v
-known-good hash mismatch
-        |
-        v
-MORI integrity alert
-```
+## PoC Distribution
 
-MORI Guard attempts to interrupt the exploitation path before that consequence
-occurs:
+The exploit PoC source and executable used for validation are not redistributed
+as part of this repository evidence set.
 
-```text
-Copy Fail attempt
-        |
-        v
-algif_aead requested
-        |
-        v
-MORI Guard denies load
-        |
-        v
-exploit chain interrupted
-```
+Instead, provenance is preserved through repository commit identifiers,
+cryptographic hashes, screenshots, execution output, and target-integrity
+validation.
 
-During the blocked test, MORI Monitor generated no integrity violation because
-`/usr/bin/su` remained unchanged.
+## Interpretation
 
-This is expected behavior and does not indicate a failure of the monitor.
+The evidence supports the narrower claim that the frozen MORI v2.7 candidate
+successfully prevented the tested CopyFail exploitation paths in this
+laboratory environment while preserving the benign behaviors exercised by the
+regression suite.
 
-## Relationship to Vendor Mitigation
-
-MORI Guard is a **compensating control**, not a correction for the underlying
-kernel defect.
-
-The initial implementation deliberately follows the same general defensive
-idea as disabling the affected `algif_aead` functionality: make the vulnerable
-interface unavailable while the vulnerable kernel remains installed.
-
-The custom implementation adds:
-
-- explicit denial logging;
-- a reproducible laboratory control;
-- observable control activation; and
-- direct comparison with MORI Monitor.
-
-It does not remove the underlying vulnerability from the kernel.
-
-Vendor remediation remains the preferred long-term fix.
-
-## Evidence
-
-The `artifacts/` directory contains textual evidence and copies of the tested
-control configuration.
-
-The `screenshots/` directory contains visual evidence from the mitigation
-experiment.
-
-The evidence sequence documents:
-
-```text
-00  MORI Guard configuration
-01  direct algif_aead module-load denial
-02  MORI Guard denial message
-03  clean pre-attempt state
-04  Copy Fail attempt blocked
-05  corresponding MORI Guard journal event
-06  post-attempt verification
-07  tested blocker implementation
-```
-
-The artifacts preserve:
-
-- the deployed `modprobe` override;
-- the tested blocker script;
-- the real denial journal event;
-- the post-attempt integrity state;
-- the deployed control state;
-- the benign AEAD compatibility test;
-- the final blocked Copy Fail retest; and
-- the corresponding MORI Guard and MORI Monitor journal output.
-
-## Proof-of-Concept Handling
-
-The original proof-of-concept source is not redistributed in this evidence
-package.
-
-The public retest artifact preserves the traceback and execution result while
-intentionally omitting proof-of-concept source lines.
-
-This retains the experimental result without publishing another copy of the
-exploit source.
-
-## Integrity
-
-`PUBLIC-SHA256SUMS.txt` provides SHA-256 hashes for every file included in
-this public evidence package except the manifest itself.
-
-The public package is regenerated and re-verified whenever published evidence
-or documentation changes.
-
-## Scope
-
-All mitigation testing was performed exclusively inside the isolated,
-user-controlled Copy Fail laboratory.
-
-The deliberately vulnerable kernel was retained specifically so that the
-custom control could be evaluated against the same environment and proof of
-concept used during the successful reproduction phase.
-
-No persistence, credential collection, lateral movement, reverse shells, or
-unrelated post-exploitation activity was performed.
+It should not be interpreted as proof that MORI prevents every possible
+variation of the vulnerability or as a replacement for an upstream kernel fix.
