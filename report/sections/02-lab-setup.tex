@@ -1,3 +1,196 @@
 \section{Laboratory Setup and Methodology}
 
-Documentation pending.
+\subsection{Laboratory Purpose and Scope}
+
+The laboratory was designed to support controlled comparison across the
+different stages of the Copy Fail investigation. Its purpose was not merely to
+provide a system on which the published proof of concept could be executed.
+The environment also needed to preserve a trustworthy reference state, allow a
+historically vulnerable state to be reconstructed deliberately, and support
+later detection, mitigation, and patch-validation experiments under comparable
+conditions.
+
+Four methodological principles guided the design. First, all
+vulnerability-specific activity was confined to an isolated, privately owned
+virtual network. Second, the patched reference system and the vulnerable
+reproduction target were maintained as separate virtual machines rather than
+as successive states of a single machine. Third, reproduction was performed
+from a dedicated local account without administrative privileges, ensuring
+that successful access to UID~0 could be attributed to the tested
+privilege-escalation path. Finally, each experimental phase was treated as a
+separate checkpoint with its own command output, screenshots, configuration
+artifacts, and integrity manifests.
+
+This design separates the system state used for comparison from the state
+being modified during experimentation. It also allows observations from later
+phases to be interpreted against documented preconditions instead of relying
+on an increasingly mutated virtual machine. The following sections describe
+the infrastructure, network isolation, virtual-machine roles, account
+separation, experimental sequence, and evidence-handling process used to
+maintain that distinction.
+
+\subsection{Infrastructure and Network Isolation}
+
+The laboratory was hosted on a Dell OptiPlex 5070 Micro running Proxmox
+VE~9.2.5. The host provided an Intel Core i5-9500T processor and approximately
+31~GiB of memory. These specifications establish the scale of the environment,
+but the experiment did not depend on specialised hardware. Both Copy Fail test
+systems were conventional x86-64 KVM/QEMU virtual machines.
+
+\begin{table}[H]
+    \centering
+    \caption{Relevant laboratory infrastructure and network roles.}
+    \label{tab:lab-infrastructure}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.27\textwidth}Y@{}}
+        \toprule
+        Component & Configuration and role \\
+        \midrule
+        Physical host &
+        Dell OptiPlex 5070 Micro, Intel Core i5-9500T, approximately 31~GiB RAM \\
+
+        Hypervisor &
+        Proxmox VE~9.2.5 using KVM/QEMU virtualization \\
+
+        Laboratory gateway &
+        OPNsense virtual firewall separating the management-facing and internal
+        laboratory segments \\
+
+        Management bridge &
+        \code{vmbr0}, connected to the ordinary management network and to the
+        management-facing interface of OPNsense \\
+
+        Internal bridge &
+        \code{vmbr1}, providing the isolated Layer-2 segment used by the Copy
+        Fail guest systems \\
+
+        Guest attachment &
+        A single virtual network interface on \code{vmbr1}; addressing and the
+        default gateway were provided within the laboratory subnet \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The logical network path is shown in \cref{fig:lab-topology}. Private IP
+addresses, MAC addresses, and unrelated details of the surrounding home
+network are intentionally omitted because they do not affect reproduction of
+the experiment.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        infrastructure/.style={
+            draw=MoriRule,
+            fill=MoriCode,
+            text=MoriInk,
+            minimum width=6.2cm,
+            minimum height=0.9cm,
+            align=center,
+            font=\displayfont\small
+        },
+        boundary/.style={
+            draw=MoriPurple,
+            fill=MoriMist,
+            text=MoriInk,
+            line width=0.8pt,
+            minimum width=6.2cm,
+            minimum height=0.95cm,
+            align=center,
+            font=\displayfont\small\bfseries
+        },
+        guest/.style={
+            draw=MoriRule,
+            fill=MoriPaper,
+            text=MoriInk,
+            minimum width=5.4cm,
+            minimum height=1.05cm,
+            align=center,
+            font=\displayfont\small
+        },
+        path/.style={
+            <->,
+            line width=0.75pt,
+            draw=MoriMuted
+        },
+        pathlabel/.style={
+            fill=MoriPaper,
+            inner sep=2pt,
+            text=MoriDeepPurple,
+            font=\ttfamily\scriptsize
+        }
+    ]
+        \node[infrastructure] (management) at (0,0)
+            {Home / management network};
+        \node[boundary] (firewall) at (0,-1.8)
+            {OPNsense firewall and laboratory gateway};
+        \node[infrastructure] (laboratory) at (0,-3.6)
+            {Isolated laboratory LAN};
+        \node[guest] (reference) at (-3.15,-5.35)
+            {VM 270\\Patched reference system};
+        \node[guest] (vulnerable) at (3.15,-5.35)
+            {VM 271\\Vulnerable reproduction target};
+
+        \draw[path] (management) -- node[pathlabel] {vmbr0} (firewall);
+        \draw[path] (firewall) -- node[pathlabel] {vmbr1} (laboratory);
+        \draw[->,line width=0.75pt,draw=MoriMuted]
+            (laboratory.south) -- ++(0,-0.45) -| (reference.north);
+        \draw[->,line width=0.75pt,draw=MoriMuted]
+            (laboratory.south) -- ++(0,-0.45) -| (vulnerable.north);
+    \end{tikzpicture}
+    \caption{Logical separation between the management network and the Copy
+    Fail guest systems.}
+    \label{fig:lab-topology}
+\end{figure}
+
+Neither Copy Fail guest was attached directly to \code{vmbr0}. Their only
+virtual network interface was connected to \code{vmbr1}, so communication
+between the laboratory segment and the ordinary management network crossed the
+OPNsense policy boundary. This prevented the deliberately vulnerable systems
+from sharing the ordinary network's Layer-2 segment while retaining controlled
+administrative access when required. The vulnerability itself was exercised
+locally inside VM~271; no third-party or internet-facing target formed part of
+the test path.
+
+\subsection{Virtual-Machine Roles and State Separation}
+
+The two Copy Fail guests shared a controlled starting configuration. VM~270,
+\code{copyfail01}, ran Ubuntu Server 24.04.2 LTS with two virtual CPUs, 4~GiB of
+memory, a 32~GiB virtual disk, and one \code{vmbr1} network interface. Once it
+had been established as a patched reference, VM~271, \code{copyfail-vuln}, was
+created as a full clone. The clone retained the same operating-system lineage
+and virtual-hardware profile, but its machine identity and SSH host keys were
+regenerated so that the guests no longer shared host identity.
+
+The virtual machines were assigned different roles before reconstruction.
+VM~270 was preserved as the known-good comparison system and was not downgraded
+or repeatedly reconfigured for exploit testing. VM~271 was the only guest
+deliberately modified for vulnerable-kernel reconstruction, reproduction,
+detection, mitigation, and validation. \Cref{tab:vm-roles} summarizes this
+division.
+
+\begin{table}[H]
+    \centering
+    \caption{Virtual-machine roles and permitted state changes.}
+    \label{tab:vm-roles}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.20\textwidth}p{0.25\textwidth}Y@{}}
+        \toprule
+        Virtual machine & Experimental role & Permitted state changes \\
+        \midrule
+        VM 270 \code{copyfail01} &
+        Patched reference &
+        Preserved as the known-good comparison state; no deliberate
+        vulnerable reconstruction \\
+
+        VM 271 \code{copyfail-vuln} &
+        Experimental target &
+        Vulnerable reconstruction, reproduction, detection, mitigation, and
+        validation activities \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Although the guests were not independent experimental samples, cloning reduced
+irrelevant starting differences and state separation protected the reference
+from destructive work. Comparisons therefore used a preserved control rather
+than an undocumented earlier state of the modified target.

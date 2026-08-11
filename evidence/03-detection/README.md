@@ -1,4 +1,4 @@
-# 03 — Detection
+# 03 Detection
 
 This directory contains the threat-surface analysis, detector implementation,
 and experimental evidence for the custom Copy Fail detection control.

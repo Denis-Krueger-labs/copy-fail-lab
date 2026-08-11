@@ -1,4 +1,4 @@
-# MORI v2 — Correlated eBPF/LSM Compensating Control
+# MORI v2 Correlated eBPF/LSM Compensating Control
 
 MORI v2 is the second-generation experimental compensating control developed during the Copy Fail research lab.
 
@@ -22,7 +22,7 @@ The final enforcement action is an LSM denial returning `EPERM`.
 
 ## Development progression
 
-### v2.1 — Initial privileged-file observation
+### v2.1  Initial privileged-file observation
 
 The first prototype observed non-root reads of root-owned SUID files through the BPF LSM `file_permission` hook.
 
@@ -34,7 +34,7 @@ Evidence:
 - `01-mori-v2-false-positive-mori-monitor.png`
 - `02-mori-monitor-service-context.png`
 
-### v2.1.1 — Trusted monitor filtering
+### v2.1.1  Trusted monitor filtering
 
 A `trusted_tgids` BPF map was introduced.
 
@@ -47,7 +47,7 @@ Evidence:
 - `05-mori-v2-1-1-untrusted-suid-read-detected.png`
 - `06-mori-v2-1-1-implementation-hashes.png`
 
-### v2.1.2 — Authenticated monitor trust
+### v2.1.2  Authenticated monitor trust
 
 TGID membership alone was considered insufficient for the trust decision.
 
@@ -74,7 +74,7 @@ Evidence:
 - `12-mori-v2-1-2-restored-monitor-trust-recovered.png`
 - `13-mori-v2-1-2-final-artifact-hashes.png`
 
-### v2.2 — AF_ALG AEAD observation
+### v2.2  AF_ALG AEAD observation
 
 A BPF LSM `socket_bind` program was added.
 
@@ -93,7 +93,7 @@ Evidence:
 - `16-mori-v2-2-benign-aead-bind-preserved.png`
 - `17-mori-v2-2-final-artifact-hashes.png`
 
-### v2.3 — Same-process temporal correlation
+### v2.3  Same-process temporal correlation
 
 An `aead_state` BPF map was added.
 
@@ -114,7 +114,7 @@ Evidence:
 - `21-mori-v2-3-suid-only-negative-control.png`
 - `22-mori-v2-3-final-artifact-hashes.png`
 
-### v2.4 — Splice observation and cross-hook correlation
+### v2.4  Splice observation and cross-hook correlation
 
 A disposable `fentry/do_splice` probe was first used to establish whether splice activity could be observed on the vulnerable kernel.
 
@@ -145,7 +145,7 @@ Evidence:
 - `27-mori-v2-4-aead-splice-suid-triple-correlation.png`
 - `28-mori-v2-4-final-artifact-hashes.png`
 
-### v2.5 — Shadow policy
+### v2.5  Shadow policy
 
 The triple-correlation condition was converted into a shadow enforcement decision.
 
@@ -169,7 +169,7 @@ Evidence:
 - `31-mori-v2-5-splice-only-negative-control.png`
 - `32-mori-v2-5-final-artifact-hashes.png`
 
-### v2.6 — Selective enforcement
+### v2.6  Selective enforcement
 
 The validated shadow decision was converted to an actual LSM denial.
 
@@ -187,7 +187,7 @@ Evidence:
 - `33-mori-v2-6-selective-enforcement-blocks-correlated-splice.png`
 - `34-mori-v2-6-final-artifact-hashes.png`
 
-### v2.6.1 — Structured deny telemetry
+### v2.6.1  Structured deny telemetry
 
 A BPF ring buffer was added.
 
@@ -212,7 +212,7 @@ Evidence:
 - `35-mori-v2-6-1-ring-buffer-deny-event-delivery.png`
 - `36-mori-v2-6-1-final-artifact-hashes.png`
 
-### v2.6.2 — Attacker-facing notification
+### v2.6.2  Attacker-facing notification
 
 The userspace telemetry handler was extended with an optional attacker-facing notification.
 

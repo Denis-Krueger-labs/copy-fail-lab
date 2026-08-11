@@ -1,4 +1,4 @@
-# 04 — Custom Mitigation: MORI
+# 04 Custom Mitigation: MORI
 
 This evidence set documents the development, regression testing, and final
 validation of MORI, an eBPF-based compensating control developed for the
