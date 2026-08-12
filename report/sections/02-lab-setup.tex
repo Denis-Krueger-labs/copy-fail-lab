@@ -194,3 +194,246 @@ Although the guests were not independent experimental samples, cloning reduced
 irrelevant starting differences and state separation protected the reference
 from destructive work. Comparisons therefore used a preserved control rather
 than an undocumented earlier state of the modified target.
+
+\subsection{Account and Privilege Separation}
+
+Privileged laboratory preparation and unprivileged test execution were assigned
+to separate local accounts. The \code{researcher} account, with UID~1000 and
+primary GID~1000, provided the administrative context required for kernel
+management, package and service configuration, instrumentation, and evidence
+collection. Its recorded memberships included the administrative groups
+\code{adm}, \code{sudo}, and \code{lxd}. Root authority was used where these
+tasks required it, but neither the administrative account nor an existing root
+shell formed part of the attacker execution context.
+
+The dedicated \code{labuser} account, with UID~1001 and primary GID~1001,
+represented an attacker-controlled but initially unprivileged local foothold.
+Its recorded supplementary membership was limited to the ordinary
+\code{users} group (GID~100); it was not assigned membership in administrative
+groups such as \code{sudo} or \code{lxd}. The threat model therefore assumed
+that an attacker had already obtained command execution as this ordinary
+account; the preceding compromise was not reproduced. Both tested Copy Fail
+implementations were launched from this account's shell, so the experiment
+began on the unprivileged side of the local privilege boundary.
+\Cref{tab:account-roles} summarizes the resulting separation of duties.
+
+\begin{table}[H]
+    \centering
+    \caption{Account roles and privilege contexts used in the laboratory.}
+    \label{tab:account-roles}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.20\textwidth}p{0.28\textwidth}Y@{}}
+        \toprule
+        Account & Starting context & Laboratory role \\
+        \midrule
+        \code{researcher} (UID 1000) &
+        Administrative; member of \code{adm}, \code{sudo}, and \code{lxd} &
+        Environment preparation, instrumentation, and privileged evidence
+        collection \\
+
+        \code{labuser} (UID 1001; GID 1001) &
+        Unprivileged local user; supplementary membership limited to
+        \code{users} (GID 100) &
+        Attacker-controlled foothold and direct execution of the Python and C
+        proof-of-concept implementations \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Before each relevant trial, the active identity and privilege state were
+recorded from the test account. Keeping preparation and execution contexts
+separate prevents an inherited administrative session, a \code{sudo}-launched
+process, or a pre-existing root shell from being mistaken for successful local
+privilege escalation. Any later change in effective privilege could therefore
+be evaluated against the documented UID~1001 starting state and attributed to
+the tested execution path rather than to laboratory setup.      
+
+\subsection{Threat Model and Security Objectives}
+
+The threat model begins after initial access has already occurred. The attacker
+is assumed to control the local \code{labuser} account and therefore starts with
+command execution as UID~1001 rather than with administrative authority. From
+this foothold, the attacker may execute arbitrary local programs, invoke kernel
+interfaces available to an ordinary user, and interact with readable privileged
+executables. The attacker may also choose the proof-of-concept implementation,
+create processes or threads, arrange relevant system calls, and introduce
+delays under their control. The preceding compromise of \code{labuser} is an
+assumed precondition and is not itself reproduced.
+
+At the start of an attempt, the attacker does not possess UID~0, membership in
+\code{sudo} or \code{lxd}, administrative credentials, or ordinary write access
+to the targeted SUID executable. The relevant trust boundary is therefore the
+transition from the unprivileged UID~1001 context to root authority. Copy Fail
+threatens that boundary by combining the accessible AF\_ALG AEAD and
+\code{splice()} paths with modification of file-backed page-cache contents
+belonging to a readable privileged executable. The protected assets are both
+the integrity of privileged executable code and the authority obtained when
+that code is executed with UID~0.
+
+The experiment evaluates the objectives in \cref{tab:security-objectives}.
+These criteria distinguish observation from enforcement and separate a
+compensating control from correction of the underlying kernel flaw.
+
+\begin{table}[H]
+    \centering
+    \caption{Security objectives derived from the experimental threat model.}
+    \label{tab:security-objectives}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.22\textwidth}Y@{}}
+        \toprule
+        Objective & Required property \\
+        \midrule
+        Privilege-boundary protection &
+        Prevent an unauthorised transition from the documented UID~1001
+        starting context to UID~0. \\
+
+        Executable integrity &
+        Preserve the contents and security-relevant state of the targeted
+        privileged executable during a prevented attempt. \\
+
+        Behavioural detection &
+        Identify the exploitation behaviour without depending on a particular
+        proof-of-concept filename, programming language, or executable hash. \\
+
+        Selective correlation &
+        Associate the relevant operations within the attacker-controlled
+        execution context while avoiding attribution across unrelated
+        processes and remaining robust against attacker-controlled timing. \\
+
+        Compatibility &
+        Preserve unrelated legitimate uses of the affected interfaces where
+        technically possible, allowing the cost of a selective control to be
+        compared with disabling the affected subsystem. \\
+
+        Patch independence &
+        Verify that a corrected kernel prevents the tested escalation path
+        without relying on the custom compensating control. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Observation alone does not satisfy the prevention objective. A mechanism is
+treated as preventive only if it interrupts the attempted privilege escalation
+and the protected target retains its integrity. Likewise, the custom
+compensating control is expected to act on the correlated exploitation path
+rather than on one known proof-of-concept artifact. Compatibility is evaluated
+separately so that removing the vulnerable interface and selectively
+restricting its dangerous use are not treated as equivalent defensive
+properties.
+
+The model excludes the means by which \code{labuser} was initially compromised,
+remote exploitation, persistence, credential collection, reverse shells,
+lateral movement, container escape, unrelated privilege-escalation techniques,
+and post-root activity beyond the minimal evidence needed to establish the
+privilege state. These exclusions keep the analysis focused on whether control
+of an ordinary local account can be escalated through Copy Fail, and whether the
+evaluated defences prevent that transition under the stated conditions.
+
+\subsection{Experimental Sequence and State Transitions}
+
+The investigation was organised as a sequence of controlled system states
+rather than as one continuous session on an increasingly modified machine.
+VM~270 remained the patched reference, while VM~271 was moved deliberately
+through vulnerable reconstruction, reproduction, observation, mitigation, and
+final patch-validation states. This separation provided a stable comparison
+system and made the state-changing work on VM~271 explicit.
+
+Each phase followed the same control cycle. A relevant snapshot or documented
+checkpoint was first established or restored. The running kernel, required
+interfaces, active account, defensive-control state, and protected target were
+then verified as applicable to that phase. Pre-test evidence was captured before
+the phase-specific activity was performed. Event output, privilege state, and
+target state were recorded immediately afterwards, and the resulting artifacts
+were preserved before another kernel, configuration, or control change was
+introduced. \Cref{tab:experimental-sequence} maps this procedure onto the
+complete experimental sequence.
+
+\begin{table}[H]
+    \centering
+    \caption{Controlled experimental sequence and state transitions.}
+    \label{tab:experimental-sequence}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.20\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+        \toprule
+        Phase & Established state & Methodological purpose \\
+        \midrule
+        Reference baseline &
+        VM~270 preserved as the patched reference &
+        Record a known-good comparison state that was not subjected to
+        vulnerable reconstruction or exploit development. \\
+
+        Vulnerable reconstruction &
+        VM~271 booted into the selected historical kernel with the required
+        Copy Fail interfaces available &
+        Establish and verify the preconditions for reproduction without
+        altering the reference system. \\
+
+        Unmitigated reproduction &
+        Vulnerable VM~271 with no Copy Fail-specific enforcement active &
+        Execute the proof of concept from the documented UID~1001 context and
+        capture the pre-test and post-test privilege and target states. \\
+
+        Observation and detection &
+        Reproducible vulnerable state with monitoring introduced separately
+        from enforcement &
+        Identify observable behaviour, evaluate integrity-based monitoring,
+        and compare behavioural evidence with artifact-specific detection. \\
+
+        Broad mitigation comparison &
+        Vulnerable kernel with interface-level restriction applied and then
+        removed under controlled conditions &
+        Test the preventive effect and compatibility cost of removing access to
+        the affected interface before developing a selective control. \\
+
+        Selective MORI development &
+        Vulnerable kernel with successive observation, correlation, shadow,
+        and enforcement candidates &
+        Exercise positive, negative, cross-context, timing, alternate-target,
+        and implementation-independent regression cases before freezing the
+        candidate used for final vulnerable-kernel testing. \\
+
+        Vendor-patch validation &
+        VM~271 updated to the corrected kernel with MORI isolated from the
+        active enforcement path &
+        Repeat the interface control and both proof-of-concept paths so the
+        patched-kernel behaviour can be evaluated independently of the custom
+        compensating control. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The order of these transitions was significant. Unmitigated reproduction was
+completed before preventive mechanisms were introduced, ensuring that later
+denials could be compared with a demonstrated vulnerable path. Monitoring was
+introduced before selective enforcement so that candidate observables and
+correlation rules could be examined without initially changing the tested
+operation. Broad interface restriction provided a compatibility reference,
+whereas the later MORI stages progressively narrowed the controlled behaviour
+through observation, correlation, shadow evaluation, and active enforcement.
+
+Regression testing was treated as part of control development rather than as a
+single final exploit run. Trials varied the proof-of-concept implementation,
+process or thread context, operation ordering, attacker-controlled delay, and
+privileged target where the phase required it. Negative controls were retained
+to distinguish the correlated Copy Fail path from isolated or unrelated uses of
+the same system interfaces. A candidate was not treated as the current MORI
+implementation until these phase-specific checks had been performed against a
+documented build and system state.
+
+Vendor remediation was applied only after the vulnerable-kernel experiments
+and their checkpoints had been preserved. Isolation of MORI from the active
+enforcement path was defined as a precondition of the patched-kernel retest and
+was recorded separately from the proof-of-concept output. This prevents a
+denial caused by the compensating control from being attributed to the vendor
+patch. The affected interface was checked separately so that failure of the
+exploitation path would not be confused with wholesale removal of the tested
+functionality.
+
+The phases form a dependent engineering and validation sequence rather than a
+set of independent statistical samples. Their evidential value therefore rests
+on the documented preconditions and adjacent pre-test and post-test captures.
+Observations made after a state transition were not retroactively used to
+characterise an earlier phase; where a later test exposed a new condition, that
+condition was added as a prospective regression case and recorded in the state
+in which it was actually exercised.
+-
