@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# GitHub Linguist overrides
+# ---------------------------------------------------------------------------
+#
+# MORI preserves generated eBPF build products and historical checkpoints
+# as research evidence. They belong in the repository, but they should not
+# inflate the authored-language statistics.
+#
+# Actual source files such as:
+#   mori_observer.c
+#   mori_observer.bpf.c
+#   mori_splice_probe.c
+#   mori_splice_probe.bpf.c
+#
+# remain fully counted.
+
+
+# Generated libbpf skeleton headers.
+**/*.skel.h linguist-generated
+
+# Generated kernel type header.
+**/vmlinux.h linguist-generated
+
+# Compiled eBPF object files.
+**/*.bpf.o linguist-generated
+
+# Preserved compiled MORI binaries.
+**/mori_observer linguist-generated
+**/mori_splice_probe linguist-generated
+**/mori_observer.v2.7 linguist-generated
