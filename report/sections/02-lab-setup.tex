@@ -436,4 +436,130 @@ Observations made after a state transition were not retroactively used to
 characterise an earlier phase; where a later test exposed a new condition, that
 condition was added as a prospective regression case and recorded in the state
 in which it was actually exercised.
--
+
+\subsection{Evidence Collection, Integrity, and Publication Workflow}
+
+Evidence collection was performed alongside the experimental phases and kept
+separate from the analytical report. Each phase directory was organised around
+the system state and question being tested, normally combining machine-readable
+artifacts, screenshots, explanatory documentation, and an integrity manifest.
+This structure allowed later claims to be traced to the relevant precondition,
+execution, and post-test records without treating the report narrative itself
+as primary evidence.
+
+The evidence classes in \cref{tab:evidence-classes} served complementary
+purposes. No single class was treated as sufficient for every claim.
+
+\begin{table}[H]
+    \centering
+    \caption{Evidence classes and their methodological roles.}
+    \label{tab:evidence-classes}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}Y@{}}
+        \toprule
+        Evidence class & Primary function & Limitation addressed by complementary evidence \\
+        \midrule
+        Command output and logs &
+        Preserve exact kernel, account, service, event, permission, and target
+        state in searchable form. &
+        The capture reflects only the commands that were selected and may be
+        incomplete if permissions or collection failed. \\
+
+        Screenshots &
+        Preserve visible terminal context, command ordering, simultaneous
+        telemetry, and interactive outcomes. &
+        A screenshot is selective, may lack an embedded timestamp, and does not
+        provide the complete machine-readable output. \\
+
+        Configuration and source &
+        Record the detector, mitigation, service, policy, and test material
+        relevant to a phase. &
+        Source alone does not establish which build was loaded or exercised. \\
+
+        Build and provenance records &
+        Associate source, generated objects, executable builds, compiler
+        context, repository revisions, and cryptographic digests. &
+        Provenance links artifacts to a tested candidate but does not by itself
+        demonstrate the candidate's runtime behaviour. \\
+
+        Snapshots and checkpoints &
+        Preserve recoverable system states and historical MORI implementations
+        before later changes are introduced. &
+        A snapshot name or checkpoint establishes recoverability, not the truth
+        of an experimental claim without adjacent captures. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+For state-changing trials, evidence was collected around the test rather than
+only after it. Applicable pre-test captures identified the running kernel,
+active account, relevant interface or module state, defensive-control state,
+and security-relevant properties of the privileged target. Execution output
+and telemetry were then recorded together with the resulting privilege and
+target state. Where chronology was material, timestamps were included inside
+the capture when practicable. File-system and archive modification times were
+treated as supporting metadata rather than as the sole proof of event order.
+
+Evidence numbering and phase-specific maps preserved the recorded sequence.
+Missing or removed items were not hidden by renumbering later objects. A
+supplemental capture could clarify a retained state or artifact, but it could
+not retroactively establish a precondition that had not been captured at the
+relevant time. It therefore required explicit labelling rather than being
+presented as part of the original sequence.
+
+Implementation provenance was recorded separately from runtime results. MORI
+checkpoint directories preserved successive source, generated BPF objects,
+skeletons, and userspace builds; the validated candidate was placed under the
+distinct \code{current/} path. Cryptographic digests and provenance records
+associated the frozen source and build artifacts with the candidate used for
+final regression. Proof-of-concept provenance used available repository
+revisions, source and binary hashes, compiler information, and execution
+captures without requiring redistribution of the exploit implementation.
+
+Integrity protection followed a two-stage workflow. Raw evidence was collected
+and hashed before the private original was preserved. Publication work was then
+performed on a separate copy. After redaction, omission, renaming, or other
+sanitization, the public package received its own SHA-256 manifest and was
+verified again after assembly or transfer. Public and private digests were not
+treated as interchangeable because a legitimate publication transformation
+necessarily changes the affected bytes.
+
+Manifest scope was defined per evidence package. The manifest itself was
+excluded from its own coverage, and editable documentation could be included or
+explicitly excluded depending on the phase. Consequently, the presence of a
+file beside \code{PUBLIC-SHA256SUMS.txt} did not automatically mean that the
+file was covered; verification used the manifest's enumerated paths. Whenever a
+filename or packaged object changed, the affected public manifest had to be
+regenerated and reverified before the package could be frozen.
+
+SHA-256 verification was used as a change-detection mechanism, not as proof
+that a capture was complete or correctly interpreted. A matching digest shows
+that the checked bytes correspond to the version listed by the manifest. It
+does not establish when the command ran, whether the selected command captured
+the intended property, whether a screenshot omitted relevant context, or
+whether a README describes the artifact accurately. Content review and
+cryptographic verification were therefore treated as separate publication
+gates.
+
+The public evidence copy was reviewed for credentials, tokens, internal network
+details, machine identifiers, and unrelated environmental information. Exploit
+source or other material unnecessary for verification could be withheld while
+retaining hashes, provenance, system state, and execution outcomes. Omissions
+were documented explicitly, and numbering gaps were preserved where useful to
+show that an item had been removed. The unsanitized source record remained
+separate so that publication edits did not overwrite the original capture.
+
+Incomplete captures were retained and described according to what they actually
+contained. A permission error, truncated transcript, or screenshot-only
+execution was not relabelled as a successful machine-readable capture. Where a
+contemporaneous screenshot supplied information missing from a text artifact,
+the two could be cited together, but the screenshot did not alter the contents
+or status of the failed capture. No retrospective execution transcript was
+manufactured to make the evidence package appear more complete.
+
+This workflow provides traceability and detects changes within the project
+evidence set, but it is not equivalent to a formal forensic acquisition with an
+independent trusted timestamp, hardware-backed attestation, or an external
+witness. Claims in later chapters are therefore limited to the properties
+actually preserved by the cited artifacts and to the controlled laboratory
+states in which those artifacts were collected.

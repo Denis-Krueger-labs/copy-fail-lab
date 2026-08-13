@@ -1,1 +1,3 @@
 .vscode
+# LaTeX build output
+report/build/
