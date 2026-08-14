@@ -1,3 +1,136 @@
 \section{Clean Baseline}
 
-Documentation pending.
+\subsection{Purpose of the Baseline}
+
+Before vulnerability-specific validation began, a clean baseline of the
+reference virtual machine, VM~270 \code{copyfail01}, was recorded. The purpose
+of this baseline was to establish the operating state from which later
+experimental changes and observations could be evaluated. It therefore
+documented the system before Copy Fail-specific configuration changes, package
+upgrades, proof-of-concept execution, or exploitation had taken place within
+the research sequence.
+
+The baseline served three related methodological functions. First, it preserved
+the exact operating-system, kernel, package, network, and storage state needed
+to contextualise later results. Second, it provided a comparison point for
+distinguishing pre-existing conditions from changes introduced during
+vulnerability reconstruction, reproduction, detection, mitigation, or patch
+validation. Third, the associated integrity records and virtual-machine
+snapshot established a recoverable checkpoint from which the documented
+reference state could be verified or restored.
+
+The term \emph{clean baseline} describes the machine's position in the
+experimental sequence; it is not, by itself, a claim that the installed system
+was unaffected by Copy Fail or that every security-relevant property had been
+validated. This chapter records what was present and verifies the integrity of
+that record. The significance of those facts for the Copy Fail prerequisites is
+examined separately in the vulnerability analysis in Chapter~4.
+
+\subsection{Operating-System State}
+
+The operating-system baseline was recorded from within the running guest using
+\code{hostnamectl} and \code{/etc/os-release}. These sources identify the
+system as it represented itself at collection time, independently of the name
+assigned to the virtual machine by the hypervisor. The resulting identity is
+summarised in \cref{tab:baseline-os-state}.
+
+\begin{table}[H]
+    \centering
+    \caption{Recorded operating-system identity of the reference guest.}
+    \label{tab:baseline-os-state}
+    \small
+    \begin{tabularx}{0.88\textwidth}{@{}>{\bfseries}p{0.31\textwidth}Y@{}}
+        \toprule
+        Property & Recorded baseline state \\
+        \midrule
+        Hypervisor identifier &
+        Proxmox VM~270, configured with the name \code{copyfail01} \\
+
+        Guest hostname &
+        \code{copyfail01} \\
+
+        Operating system &
+        Ubuntu 24.04.2 LTS (Noble Numbat) \\
+
+        Architecture &
+        \code{x86-64} \\
+
+        Virtualization &
+        KVM guest using QEMU Q35 virtual hardware \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The hostname reported inside the guest agrees with the name recorded in the
+Proxmox configuration for VM~270. This agreement links the operating-system
+artifacts to the reference virtual machine without relying exclusively on
+either the guest or hypervisor naming record. The captured hardware vendor and
+model additionally identify a QEMU virtual platform, consistent with the KVM
+virtualization state reported by \code{hostnamectl}.
+
+Machine and boot identifiers were redacted from the publication copy because
+they are not required to reproduce or interpret the experiment. Their omission
+does not alter the operating-system identity established by the retained
+hostname, release, architecture, and virtualization records. This subsection
+therefore establishes which guest environment was documented; the exact kernel
+and package state are recorded separately in the following sections.
+
+\subsection{Kernel State}
+
+The running kernel was identified through three complementary records: a
+direct release capture, the complete \code{uname} output, and
+\code{/proc/version}. All three reported the release
+\code{6.8.0-137-generic}. The package inventory separately associated that
+release with the installed Ubuntu kernel image and its corresponding generic
+image metapackage, as summarised in \cref{tab:baseline-kernel-state}.
+
+\begin{table}[H]
+    \centering
+    \caption{Recorded kernel state of the reference guest.}
+    \label{tab:baseline-kernel-state}
+    \small
+    \begin{tabularx}{0.92\textwidth}{@{}>{\bfseries}p{0.31\textwidth}Y@{}}
+        \toprule
+        Property & Recorded baseline state \\
+        \midrule
+        Running release &
+        \code{6.8.0-137-generic} \\
+
+        Kernel build &
+        \code{\#137-Ubuntu SMP PREEMPT\_DYNAMIC}, built 17 July 2026 at
+        20:28:23 UTC \\
+
+        Installed image package &
+        \code{linux-image-6.8.0-137-generic} \\
+
+        Package version &
+        \code{6.8.0-137.137} \\
+
+        Tracking metapackage &
+        \code{linux-image-generic}, version \code{6.8.0-137.137} \\
+
+        Package architecture &
+        \code{amd64} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The running release and installed package records therefore identify the same
+kernel revision from two different views of the system: the active kernel and
+the package database. This distinction matters because the presence of an
+installed image alone would not establish that the guest had booted into that
+image, while a runtime release string alone would not preserve the associated
+package version.
+
+The baseline also recorded the SHA-256 digest of
+\code{/boot/vmlinuz-6.8.0-137-generic}:
+
+\begin{center}
+    \small\code{76a7f2ef15fcbd2f5c25cd7e7b413f903b2078396063557f1dffb4a0b089a964}
+\end{center}
+
+This digest identifies the exact kernel image present at collection time and
+provides a stable comparison value for retained or transferred copies. It does
+not by itself establish whether the kernel contains a particular correction or
+whether another defensive mechanism affects Copy Fail. Those questions require
+the vulnerability-specific validation presented in Chapter~4.
