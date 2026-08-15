@@ -134,3 +134,220 @@ provides a stable comparison value for retained or transferred copies. It does
 not by itself establish whether the kernel contains a particular correction or
 whether another defensive mechanism affects Copy Fail. Those questions require
 the vulnerability-specific validation presented in Chapter~4.
+
+\subsection{Package State}
+
+The package baseline combined a complete installed-package inventory with a
+separate record of packages reported as upgradable. The installed inventory
+contained 680 package entries, while the upgrade query recorded 77 candidate
+updates at collection time. The latter were documented rather than applied
+before the baseline snapshot, preserving the package state from which the
+subsequent investigation began.
+
+Reproducing the full inventory in the report would obscure the baseline facts
+that are relevant to later comparisons. \Cref{tab:baseline-package-state}
+therefore presents a selected summary; the complete package names and versions
+remain in the integrity-protected command output.
+
+\begin{table}[H]
+    \centering
+    \caption{Selected package-state facts retained for baseline comparison.}
+    \label{tab:baseline-package-state}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}Y@{}}
+        \toprule
+        Category & Recorded item & Baseline state \\
+        \midrule
+        Inventory scope &
+        Installed packages &
+        680 package entries with recorded versions \\
+
+        Pending changes &
+        Upgradable packages &
+        77 entries recorded; updates not applied before the snapshot \\
+
+        Kernel support &
+        \code{kmod} &
+        Version \code{31+20240202-2ubuntu7.2} \\
+
+        Initial RAM disk &
+        \code{initramfs-tools} &
+        Version \code{0.142ubuntu25.4} \\
+
+        Existing observability &
+        \code{bpfcc-tools}; \code{bpftrace}; \code{linux-tools-common} &
+        Versions \code{0.29.1+ds-1ubuntu7}, \code{0.20.2-1ubuntu4.3}, and
+        \code{6.8.0-137.137} \\
+
+        General tooling &
+        \code{git}; \code{python3} &
+        Versions \code{1:2.43.0-1ubuntu7.3} and
+        \code{3.12.3-0ubuntu2.1} \\
+
+        Build toolchain &
+        Compiler and build packages &
+        No \code{build-essential}, GCC, Clang, Make, \code{bpftool}, or
+        \code{libbpf-dev} package entry in the captured inventory \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The selected observability packages were therefore part of the documented
+starting environment rather than evidence of later detector execution. In the
+same way, the absence of the listed compiler and build packages records only
+the captured package-database state; it does not establish whether a particular
+binary could have been introduced by another method. This distinction prevents
+package presence or absence from being treated as proof of experimental
+activity.
+
+The pending-upgrade list is likewise a state record, not a vulnerability
+assessment. It shows that the reference image was preserved before available
+repository updates were applied, allowing later package changes to be compared
+with a fixed starting point. The security significance of the installed kernel
+and any Copy Fail-specific defensive configuration remains part of the
+validation in Chapter~4.
+
+\subsection{Network State}
+
+The network baseline was established from both hypervisor and guest records.
+The Proxmox configuration assigned VM~270 a single VirtIO network device on the
+internal bridge \code{vmbr1}, with firewall processing enabled for that virtual
+interface. Inside the guest, the corresponding interface appeared as
+\code{enp6s18}. No second non-loopback guest interface was present in the
+captured address state.
+
+Netplan configured \code{enp6s18} for IPv4 address assignment through DHCP.
+The runtime capture showed the interface in the \code{UP} state with a dynamic
+address on the laboratory subnet and a link-local IPv6 address. The route table
+contained a connected route for that subnet and a default route obtained
+through the laboratory gateway. Together, these records are consistent with
+the topology described in Chapter~2: the guest was attached to the isolated
+laboratory segment and reached routed destinations through the laboratory
+gateway rather than through a direct management-network attachment.
+
+The captured listening-socket state recorded SSH on TCP port~22 for IPv4 and
+IPv6, together with the local systemd-resolved stub listeners on loopback port
+53. No other listener appeared in that capture. This result describes the
+socket state observed at collection time; it does not establish that the same
+services remained present throughout later phases or that an unlisted service
+could not be started subsequently.
+
+Concrete addressing, gateway, subnet, MAC, and link-local IPv6 values are
+omitted as unnecessary. Interface placement, bridge role, DHCP use, routing,
+and listener state document the reproducible network context without publishing
+unrelated private-laboratory identifiers.
+
+\subsection{Storage State}
+
+The hypervisor configuration presented VM~270 with one 32~GiB writable virtual
+disk using the VirtIO SCSI controller. Discard support, an I/O thread, and the
+virtual SSD flag were enabled. Inside the guest, \code{lsblk} reported the same
+device as \code{/dev/sda} with a capacity of 32~GiB, linking the guest storage
+layout to the disk recorded in the Proxmox configuration.
+
+The disk contained a 1~GiB VFAT EFI system partition mounted at
+\code{/boot/efi}, a 2~GiB ext4 partition mounted at \code{/boot}, and a
+28.9~GiB LVM physical volume. That physical volume formed the volume group
+\code{ubuntu-vg}. Its single logical volume, \code{ubuntu-lv}, provided a
+14.47~GiB ext4 root filesystem, while approximately 14.47~GiB remained
+unallocated within the volume group.
+
+At collection time, filesystem reporting rounded the root volume to 15~GiB and
+recorded 5.6~GiB used, 7.9~GiB available, and 42 per cent utilisation. The
+separate \code{/boot} and \code{/boot/efi} filesystems recorded approximately
+105~MiB and 6.2~MiB used, respectively. These values establish the capacity and
+allocation state before later experiment-specific artifacts were introduced.
+They do not imply that the partition geometry or available capacity affected
+Copy Fail; their purpose is to preserve the storage context against which later
+file and filesystem observations can be compared.
+
+\subsection{Integrity Verification}
+
+The baseline command output was protected with two SHA-256 manifests. The
+private manifest recorded the original collected artifacts before publication
+processing. After identifiers were redacted from the publication copy, a
+separate public manifest was generated from the resulting files. This preserved
+the distinction established in Chapter~2: the digest of a private original is
+not reused as though it described a sanitized derivative with different bytes.
+
+Both manifests enumerate 20 command-output artifacts. An independent check of
+the reviewed public package using \code{sha256sum -c} returned \code{OK} for
+all 20 public entries. Comparing the sanitized files with the private manifest
+produced 17 matches and three expected mismatches: \code{hostnamectl.txt},
+\code{ip-addresses.txt}, and \code{routes.txt}. These are the three records
+whose contents changed during redaction. The result therefore confirms that
+the public manifest describes the publication copy and that the observed
+private/public divergence is confined to the identified transformations.
+
+The baseline documentation records that the private manifest was verified
+before the clean snapshot was created. That historical check cannot be repeated
+from the public package alone because the three private originals are not
+published. The public verification is independently repeatable, while the
+private verification depends on preservation of the corresponding private
+evidence set.
+
+The manifests cover the captured command-output artifacts, not every metadata
+file in the evidence directory, and neither manifest authenticates itself.
+Successful verification establishes that the checked files match the retained
+digest list; it does not prove that the original commands were complete, that
+their output was correct, or that an event occurred at a particular time. The
+entry \code{kernel-sha256.txt} similarly preserves the recorded digest of the
+kernel image, while manifest verification checks the integrity of that record
+rather than rehashing the unexported kernel image. These limits keep integrity,
+authenticity, completeness, and chronology from being treated as equivalent
+claims.
+
+\subsection{Baseline Snapshot}
+
+After guest-state collection and verification of the private baseline manifest,
+the Proxmox state of VM~270 was preserved as the snapshot
+\code{clean-baseline-00}. The hypervisor listed the snapshot at 8 August 2026,
+00:46:54, with the description \emph{Fresh Ubuntu 24.04.2 LTS Copy Fail
+research target}. The listing did not state a timezone, so none is assigned to
+that timestamp here.
+
+A later read-only verification capture, taken on 13 August 2026 at
+21:53:07+02:00, found VM~270 stopped. Its configuration reported
+\code{clean-baseline-00} as the parent, and the snapshot tree placed the
+current state beneath that checkpoint. These independent hypervisor fields
+establish that the named snapshot existed and that the later VM state descended
+from it at the time of verification.
+
+The snapshot provides a rollback point for the patched reference system before
+vulnerability-specific validation. VM~270 could therefore remain the stable
+baseline described in this chapter while the experimental reconstruction was
+performed on VM~271, as described in Chapter~2.
+
+This checkpoint establishes recoverability and ancestry, not the semantic
+correctness of every artifact within the guest, the absence of all earlier
+activity, or the exact contents of an unexported virtual disk. Those claims
+remain bounded by the collected guest-state evidence, the two manifests, and
+the documented collection order. Only the evidential fields from the
+hypervisor record are reproduced here; unrelated network, storage, firmware,
+and UUID values are omitted.
+
+\subsection{Baseline Result}
+
+The baseline procedure established VM~270 \code{copyfail01} as the documented
+reference system for the remaining investigation. Its operating-system, kernel,
+package, network, listener, and storage state was recorded before
+vulnerability-specific configuration changes, proof-of-concept execution, or
+exploitation within the research sequence. Agreement between the guest and
+hypervisor identifiers links the collected artifacts to the intended virtual
+machine.
+
+The resulting evidence set provides verification at both the guest and
+hypervisor layers. The private originals and sanitized publication copies are
+described by separate SHA-256 manifests, and all 20 artifacts in the public set
+passed independent verification. At the hypervisor layer, the snapshot
+\code{clean-baseline-00} preserves a rollback point whose existence and ancestry
+were confirmed by the later Proxmox state capture.
+
+Together, these records provide a reproducible and recoverable comparison point
+for the vulnerable reconstruction, reproduction, detection, mitigation, and
+patch-validation phases. They do not independently prove whether Copy Fail was
+exploitable or absent, authenticate their own origin, or establish the cause of
+later observations. Those questions require controlled comparison with the
+experiment-specific evidence presented in the following chapters. Chapter~3
+therefore establishes a bounded reference state rather than a vulnerability
+finding.
