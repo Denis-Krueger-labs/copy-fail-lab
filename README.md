@@ -754,7 +754,7 @@ The vendor kernel remediation remains the preferred fix.
 
 ---
 
-# Phase 05 — Vendor Patch Validation
+# Phase 05 Vendor Patch Validation
 
 After MORI v2.7 validation was completed, the laboratory moved to the vendor-remediated kernel.
 
