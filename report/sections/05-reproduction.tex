@@ -1,0 +1,218 @@
+\section{Vulnerable Reconstruction and Controlled Reproduction}
+
+Chapter~4 established that VM~270 could not serve as the direct reproduction
+target. The reference system was protected by two independent conditions: its
+running kernel contained the Copy Fail correction, and its effective
+module-loading policy prevented \code{algif\_aead} from being loaded.
+VM~270 was therefore retained as the protected reference system, while the
+reproduction phase continued on the separate experimental target, VM~271.
+
+The vulnerable runtime on VM~271 was reconstructed using Ubuntu kernel
+\code{6.8.0-116-generic}, supplied by package version
+\code{6.8.0-116.116}. This version preceded the first corrected Noble kernel
+identified in Chapter~4. Before proof-of-concept execution, the running kernel,
+installed package versions, AF\_ALG module state, unprivileged user identity,
+and the metadata and SHA-256 digest of the selected SUID target were recorded.
+
+A preliminary reproduction was performed to investigate the observable effects
+of the vulnerability. Because that experiment changed the mounted view of the
+target file, the virtual machine was rebooted into the same vulnerable kernel
+before the final evidence run. The reboot restored the original observable
+target-file digest. The preserved reproduction sequence therefore began again
+from a clean observable pre-exploitation state rather than continuing from the
+preliminary investigation. Observations from the two runs are kept distinct
+throughout this chapter.
+
+During the preserved run, the proof of concept was executed by
+\code{labuser}, an ordinary local account with UID~1001. In accordance with
+the success criterion defined in Chapter~1, privilege escalation was considered
+demonstrated when the resulting shell reported UID~0. No persistence,
+credential collection, lateral movement, or unrelated post-exploitation
+activity was performed.
+
+The subsequent observations include the changed SHA-256 digest returned through
+the normal mounted/VFS view of \code{/usr/bin/su}, comparison with a direct
+read from the backing ext4 filesystem, and recovery after rebooting into the
+same vulnerable kernel. These observations are reported separately so that the
+demonstrated privilege escalation is not conflated with stronger claims about
+the vulnerability's internal kernel state.
+
+The following sections document the reconstructed runtime, the preserved
+pre-exploitation state, controlled proof-of-concept execution, resulting
+privilege transition, filesystem-view comparison, and reboot recovery. Together,
+they provide the experimental basis for answering RQ1 before the investigation
+moves to behavioural observation and detection engineering.
+
+\subsection{Experimental Boundary and Preserved Evidence Sequence}
+
+The work on VM~271 produced two logically separate experimental sequences. A
+preliminary reproduction was first used to verify the intended path and explore
+the resulting system state. That investigation included cache-drop tests and a
+direct comparison between the normal mounted view of the target and data read
+from the underlying ext4 filesystem. Because the preliminary run had already
+changed the observable target state, its post-exploitation condition was not
+reused as the starting point for the formal evidence sequence.
+
+VM~271 was rebooted before the preserved run and returned to the same
+vulnerable kernel. The active release remained
+\code{6.8.0-116-generic}. After the reboot, the mounted view of
+\code{/usr/bin/su} again produced its original known-good SHA-256 digest:
+
+\begin{lstlisting}
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+\end{lstlisting}
+
+This recovery established a clean \emph{observable} starting condition for the
+selected target before the final execution. The term does not assert that every
+byte of the guest or every item of volatile state was independently compared
+with the original clone. It means that the same vulnerable kernel was running
+and that the target's mounted-view metadata and digest had returned to their
+documented pre-exploitation values.
+
+The final evidence was then preserved in chronological order, as summarised in
+\cref{tab:reproduction-evidence-sequence}.
+
+\begin{table}[H]
+    \centering
+    \caption{Preserved sequence of the controlled reproduction evidence.}
+    \label{tab:reproduction-evidence-sequence}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.07\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+        \toprule
+        ID & Preserved form & Evidential role \\
+        \midrule
+        01 & Text artifact and screenshot &
+        Records the vulnerable kernel, unprivileged account, SUID target
+        metadata, and original target digest before execution. \\
+
+        02 & Screenshot &
+        Records \code{algif\_aead} and its AF\_ALG dependency in the loaded
+        module state used for reproduction. \\
+
+        03 & Screenshot &
+        Records proof-of-concept execution, the resulting UID~0 shell, and the
+        changed digest observed through the mounted view. \\
+
+        04 & Intentionally omitted &
+        The original screenshot exposed the complete proof-of-concept source
+        and was excluded from the public evidence package. \\
+
+        05 & Text artifact and screenshot &
+        Records the return to \code{labuser} with UID~1001 while the changed
+        mounted-view digest remained observable. \\
+
+        06 & Text artifact and screenshot &
+        Compares the changed mounted/VFS digest with the original digest
+        returned by a direct read from the backing ext4 filesystem. \\
+
+        07 & Text artifact and screenshot &
+        Records restoration of the original mounted-view digest after rebooting
+        into the same vulnerable kernel. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The missing ID~04 is retained in the numbering so that the remaining public
+items continue to correspond to the original collection order. The source is
+not redistributed, but its locally obtained representation is identified by a
+recorded size and SHA-256 digest later in this chapter. This preserves source
+provenance without embedding the complete exploit in the public report or
+evidence package.
+
+IDs~02 and~03 are preserved only as screenshots, whereas IDs~01, 05, 06, and
+07 also have machine-readable textual artifacts. The integrity manifest can
+verify the published bytes of each retained item, but it cannot turn a
+screenshot into independently executable output or reconstruct the omitted
+source. These format differences are therefore treated as evidence limitations
+rather than hidden by the chronological numbering.
+
+The cache-drop observations belong to the preliminary investigation and are
+not inserted into the final run as though they occurred within that preserved
+sequence. Values \code{1} and \code{3} did not restore the original mounted
+view during the preliminary experiment, but no causal explanation is inferred
+from that result without additional kernel-level evidence. Unless explicitly
+labelled as preliminary, the reproduction claims in the following sections are
+based on the restarted and preserved sequence summarised above.
+
+\subsection{Reconstructed Vulnerable Runtime}
+
+Chapter~4 selected Ubuntu kernel \code{6.8.0-116-generic} as the candidate
+reproduction runtime because its package version immediately precedes
+Canonical's first corrected Noble generic kernel, \code{6.8.0-117.117}
+\cite{ubuntu-copyfail-cve}. The runtime was not classified from version ordering
+alone. Direct observations from VM~271 were used to confirm both the booted
+kernel and the corresponding installed packages, as shown in
+\cref{tab:reconstructed-vulnerable-runtime}.
+
+\begin{table}[H]
+    \centering
+    \caption{Kernel runtime and package state recorded on VM~271.}
+    \label{tab:reconstructed-vulnerable-runtime}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.62\textwidth}Y@{}}
+        \toprule
+        Observation & Recorded value \\
+        \midrule
+        Running kernel release & \texttt{6.8.0-116-generic} \\
+        \texttt{linux-image-6.8.0-116-generic} & \texttt{6.8.0-116.116} \\
+        \texttt{linux-modules-6.8.0-116-generic} & \texttt{6.8.0-116.116} \\
+        \texttt{linux-modules-extra-6.8.0-116-generic} & \texttt{6.8.0-116.116} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The agreement between the active release and the three package records shows
+that the intended historical kernel was not merely installed alongside a newer
+runtime: it was the kernel actually running during the experiment. The final
+pre-exploitation artifact independently recorded the same active release after
+the reboot that separated the preliminary investigation from the preserved
+run. This placed VM~271 on the pre-fix side of the vendor boundary identified
+in Chapter~4; the later controlled execution provides the behavioural test of
+whether that reconstructed runtime was exploitable under the laboratory
+conditions.
+
+The final pre-exploitation capture initially showed no loaded AF\_ALG modules.
+However, a dry-run resolution of \code{modprobe algif\_aead} returned the
+ordinary insertion path for both the dependency and the requested module:
+
+\begin{lstlisting}
+insmod /lib/modules/6.8.0-116-generic/kernel/crypto/af_alg.ko.zst
+insmod /lib/modules/6.8.0-116-generic/kernel/crypto/algif_aead.ko.zst
+\end{lstlisting}
+
+This result is materially different from VM~270, where the same request
+resolved to an \code{install /bin/false} policy override. On VM~271, the empty
+initial module listing therefore represented an \emph{unloaded but loadable}
+state rather than evidence that the interface had been disabled through that
+normal loading path. The resolution output confirms the path that
+\code{modprobe} would take; it does not, by itself, prove that every possible
+module-loading policy or access-control path was absent.
+
+The preliminary runtime confirmation subsequently recorded the modules in the
+loaded state:
+
+\begin{lstlisting}
+algif_aead             12288  0
+af_alg                 32768  1 algif_aead
+\end{lstlisting}
+
+Evidence item~02 in the preserved sequence separately records the same loaded
+state after the clean pre-exploitation capture and before proof-of-concept
+execution. These observations establish the module prerequisite used by the
+experiment. They do not alone demonstrate a successful AEAD encrypt/decrypt
+round trip, exploitation, or privilege escalation; those claims require the
+later control and execution evidence.
+
+One evidence boundary is important here. The preliminary file
+\code{copyfail-confirmed-vulnerable-state.txt} also contains a target digest
+that had already changed through the mounted/VFS view. It is therefore not used
+as evidence of the final pre-exploitation target state. Only its narrowly
+scoped running-release, package, and loaded-module observations are used in
+this subsection. The clean target metadata and original digest are taken from
+evidence item~01 and are examined in the following subsection.
+
+Taken together, the running release, matching package records, normal module
+load resolution, and subsequently recorded loaded state show that VM~271
+satisfied the reconstructed kernel and AF\_ALG prerequisites for the controlled
+reproduction. They establish the experimental runtime without pre-empting the
+separate proof of privilege escalation.
