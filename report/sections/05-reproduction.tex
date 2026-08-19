@@ -203,16 +203,181 @@ experiment. They do not alone demonstrate a successful AEAD encrypt/decrypt
 round trip, exploitation, or privilege escalation; those claims require the
 later control and execution evidence.
 
-One evidence boundary is important here. The preliminary file
-\code{copyfail-confirmed-vulnerable-state.txt} also contains a target digest
-that had already changed through the mounted/VFS view. It is therefore not used
-as evidence of the final pre-exploitation target state. Only its narrowly
-scoped running-release, package, and loaded-module observations are used in
-this subsection. The clean target metadata and original digest are taken from
-evidence item~01 and are examined in the following subsection.
+One evidence boundary is important here. The preliminary runtime-confirmation
+artifact also contains a target digest that had already changed through the
+mounted/VFS view. It is therefore not used as evidence of the final
+pre-exploitation target state. Only its narrowly scoped running-release,
+package, and loaded-module observations are used in this subsection. The clean
+target metadata and original digest are taken from evidence item~01 and are
+examined in the following subsection.
 
 Taken together, the running release, matching package records, normal module
 load resolution, and subsequently recorded loaded state show that VM~271
 satisfied the reconstructed kernel and AF\_ALG prerequisites for the controlled
 reproduction. They establish the experimental runtime without pre-empting the
 separate proof of privilege escalation.
+
+\subsection{Preserved Pre-Exploitation State}
+
+The preserved execution sequence began with evidence item~01, captured after
+VM~271 had been rebooted out of the preliminary experiment and before the
+AF\_ALG modules were loaded for the final run. Its machine-readable artifact is
+timestamped \code{2026-08-08 23:02:32 UTC}. The observations recorded at that
+point are summarised in \cref{tab:preserved-pre-exploitation-state}.
+
+\begin{table}[H]
+    \centering
+    \caption{Observable state before the preserved proof-of-concept execution.}
+    \label{tab:preserved-pre-exploitation-state}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        Observation & Recorded value \\
+        \midrule
+        Running kernel & \texttt{6.8.0-116-generic} \\
+        Test subject & \texttt{uid=1001(labuser)}, \texttt{gid=1001(labuser)} \\
+        Supplementary membership & \texttt{100(users)} \\
+        Selected target & \texttt{/usr/bin/su} \\
+        Target metadata & \texttt{-rwsr-xr-x root root 55680} \\
+        Loaded AF\_ALG module state & No matching entries returned \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The target metadata identifies \code{/usr/bin/su} as a regular file owned by
+\code{root:root}, with a size of 55,680~bytes and the owner set-user-ID bit set.
+Immediately before execution, hashing that path through the normal mounted/VFS
+view produced:
+
+\begin{lstlisting}
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+\end{lstlisting}
+
+This digest is treated as the original known-good value within the experiment
+because it was observed before the preserved execution, matched the value later
+returned by the direct backing-filesystem read, and reappeared through the
+mounted view after reboot. The term \emph{known-good} is therefore scoped to
+the controlled comparison. It is not presented as an independently obtained
+vendor-package digest or as proof that the complete guest matched its initial
+clone byte for byte.
+
+The recorded identity places the executing subject at UID~1001 and GID~1001,
+with the displayed supplementary membership in the ordinary \code{users}
+group. This establishes that the preserved commands were issued from the
+\code{labuser} session rather than an already-root shell. The \code{id} output
+does not, on its own, prove the absence of every other privilege mechanism,
+such as file capabilities or a separate \code{sudo} authorization. The later
+transition to UID~0 is therefore evaluated from the controlled proof-of-concept
+sequence rather than inferred solely from this account listing.
+
+The empty AF\_ALG module-state field records no matching loaded entry for either
+the requested AEAD module or its displayed dependency at the time of this
+capture. The load-resolution command described in the preceding subsection was
+a dry run and did not itself alter that state. Evidence item~02 records the
+subsequent loaded state, preserving the documented ordering between the clean
+pre-exploitation capture, interface activation, and proof-of-concept execution.
+
+The accompanying screenshot separately displays the running kernel, the
+\code{id} result, and the original mounted-view digest from the interactive
+\path{labuser@copyfail-vuln} session. It does not contain an embedded timestamp
+or the complete file-metadata line; those fields are supplied by the associated
+text artifact. The two representations are consequently corroborating but not
+identical in scope.
+
+Evidence item~01 therefore provides the before-state required for the later
+comparison: a vulnerable running kernel, an observed non-root identity, a
+root-owned SUID target with its original mounted-view digest, and AF\_ALG
+modules not yet loaded for the final run. It establishes the observable
+baseline without claiming that exploitation had already occurred or that the
+entire VM state had been independently reset and verified.
+
+\subsection{Controlled Proof-of-Concept Execution and Privilege Transition}
+
+After evidence item~01 had established the observable baseline, the kernel
+modules supporting the required AF\_ALG interface were activated as a separate
+laboratory preparation step. Evidence item~02 records the \code{researcher}
+account using administrative privilege to load \code{algif\_aead}, followed by
+a module-state query whose visible output was:
+
+\begin{lstlisting}
+algif_aead             12288  0
+af_alg                 32768  1 algif_aead
+\end{lstlisting}
+
+This step is not counted as the privilege escalation. It documents that a
+privileged laboratory operator prepared the required module state before the
+test, while the proof of concept itself was subsequently launched from the
+separate \code{labuser} session. The evidence therefore does not imply that an
+unprivileged account could load a restricted kernel module; module activation
+and vulnerability exploitation are treated as distinct actions.
+
+Evidence item~03 begins with the ordinary-user prompt and records the following
+execution and validation sequence:
+
+\begin{lstlisting}
+labuser@copyfail-vuln:~$ python3 ~/copy_fail_exp.py
+# id
+uid=0(root) gid=1001(labuser) groups=1001(labuser),100(users)
+# whoami
+root
+\end{lstlisting}
+
+The execution command is shown without \code{sudo}, \code{su}, or another
+explicit privilege-granting wrapper. After the proof-of-concept command was
+launched, the visible prompt changed from the ordinary \code{\$} form to
+\code{\#}. That visual change is consistent with a privileged shell, but it is
+not used as the sole success indicator. The subsequent \code{id} and
+\code{whoami} results directly record UID~0 and the resolved user name
+\code{root}.
+
+The primary group remained GID~1001 and the displayed group memberships
+remained those of \code{labuser}. The demonstrated result is therefore a
+transition to root user identity rather than a claim that every element of the
+process credentials was replaced with the conventional root-group state. UID~0
+nonetheless satisfies the privilege-escalation success criterion defined in
+Chapter~1 and is sufficient to answer the reproduction component of RQ1.
+
+The complete proof-of-concept source is not redistributed. The local
+731-byte representation associated with the reproduction was instead
+identified by the following SHA-256 digest:
+
+\begin{lstlisting}
+d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61
+\end{lstlisting}
+
+The absent evidence position~04 originally contained a screenshot of the
+complete source and was intentionally removed from the public package. A
+separately recorded 732-byte representation differed by one trailing newline
+and was not executed. The hash above therefore identifies the documented local
+731-byte representation; it is not substituted with the later newline variant.
+This preserves byte-level identity for the retained sample without publishing
+the exploit source in the report. Because evidence item~03 does not display a
+hash calculated immediately before launch, the recorded digest provides source
+provenance rather than a cryptographic binding between the screenshot and the
+exact bytes present at that moment.
+
+The execution screenshot also records that the SHA-256 digest obtained from
+the mounted path \code{/usr/bin/su} had changed to:
+
+\begin{lstlisting}
+44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9
+\end{lstlisting}
+
+That adjacent observation is not required to prove the UID transition and is
+not interpreted here as evidence of a persistent on-disk replacement. The
+post-exploitation mounted view, the direct backing-filesystem comparison, and
+the reboot result are examined separately in the following subsections.
+
+Evidence items~02 and~03 are screenshot-only records and do not contain an
+embedded wall-clock timestamp. Their content supports the displayed module
+state, execution command, and identity results, while their ordering is derived
+from the preserved evidence sequence and its accompanying documentation rather
+than independently reconstructed from screenshot timestamps. No persistence,
+credential access, lateral movement, or unrelated post-exploitation action is
+claimed from this sequence.
+
+Within these limits, the result is direct: a command launched from the recorded
+UID~1001 \code{labuser} context on the reconstructed vulnerable runtime
+produced a shell whose identity checks returned UID~0 and \code{root}. The
+controlled reproduction therefore demonstrated the intended local privilege
+escalation without relying on the changed target digest as a proxy for success.

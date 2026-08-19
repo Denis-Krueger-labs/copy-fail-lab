@@ -1,0 +1,514 @@
+\section{Behavioural Observation and Detection Engineering}
+\label{sec:behavioural-detection}
+
+Chapter~5 established the controlled reproduction result and separated the
+decisive privilege transition from the accompanying filesystem observations.
+The same separation is necessary for detection engineering. A detector may
+observe a prerequisite, an action in the exploitation chain, a change to the
+target, or the final privileged outcome; these signals occur at different
+times and support different conclusions.
+
+The most repeatable host-side effect in the laboratory was the changed content
+returned when the selected SUID executable was read through the normal
+mounted/VFS path. Its ownership, size, and permission bits remained unchanged,
+but its SHA-256 digest differed from the value recorded before exploitation.
+This made content integrity a useful detection point even though it did not
+identify the proof-of-concept file or explain the internal kernel state that
+caused the changed view.
+
+To test that opportunity, a small integrity monitor named MORI was deployed on
+VM~271 while it still ran the reconstructed vulnerable kernel. MORI compared a
+protected known-good baseline with repeated reads of selected privileged
+executables. During a further controlled Copy Fail execution, it reported a
+digest mismatch for \code{/usr/bin/su}. The accompanying capture also showed
+that the proof of concept obtained a UID~0 shell. The experiment therefore
+demonstrated detection of the security-relevant effect, but not prevention of
+the exploit.
+
+A separate exact-sample YARA comparison was used to illustrate the difference
+between identifying one known proof-of-concept artifact and observing a
+host-side consequence. The comparison is deliberately narrow: it evaluates one
+rule whose sole condition was the known sample's SHA-256 digest. It is not an
+evaluation of YARA as a whole.
+
+This chapter documents the detection model, candidate observables, protected
+target baseline, monitor implementation, controlled result, exact-sample
+comparison, and operational limitations. It then answers RQ2 and RQ3 within the
+evidence actually preserved by the experiment.
+
+\subsection{Detection Model and Evidential Boundary}
+
+The detection question was framed around the privilege boundary rather than
+around one exploit filename. The experimentally demonstrated target was
+\code{/usr/bin/su}, but the asset being protected was the wider ability to
+execute trusted code with elevated credentials. The observed path can be
+summarised as:
+
+\begin{lstlisting}
+unprivileged local process
+    -> vulnerable AF_ALG AEAD path
+    -> changed mounted view of a privileged executable
+    -> privileged executable launched
+    -> UID 0 process
+\end{lstlisting}
+
+This representation combines evidence from the vulnerability analysis,
+controlled reproduction, and detection phases. It does not mean that every
+transition was captured by one telemetry source. In particular, the preserved
+detection dataset does not contain a syscall trace, eBPF event stream, or
+kernel trace proving the \code{AF\_ALG}, pipe, \code{splice}, and AEAD
+operations during the monitored run. Those operations describe the analysed
+Copy Fail mechanism and provide candidates for later correlation; the
+integrity mismatch and UID~0 outcome are the events directly preserved for
+this detection experiment.
+
+The evidence package contains the following principal records:
+
+\begin{table}[H]
+    \centering
+    \caption{Evidence used in the behavioural detection evaluation.}
+    \label{tab:detection-evidence}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        ID & Preserved form & Evidential role \\
+        \midrule
+        00--01 & Text artifacts and screenshots &
+        Record the root-owned SUID inventory and which targets were readable
+        and executable by \code{labuser}. \\
+
+        02--03 & Baseline and deployment records &
+        Preserve the expected target digests and the root-owned operational
+        baseline used by the monitor. \\
+
+        04 & Journal excerpt &
+        Records MORI's alert for \code{/usr/bin/su}, including the expected
+        and observed digests. \\
+
+        07 & Service-status artifact &
+        Records the running service, monitored-file count, configured interval,
+        and retained alert in the journal. \\
+
+        11--12 & Screenshots &
+        Show the alert alongside proof-of-concept execution and, in the latter
+        capture, the resulting UID~0 identity confirmation. \\
+
+        YARA & Rule, scan output, and screenshots &
+        Compare an exact-hash match for the original sample with a non-match
+        after a one-byte, non-executed variation. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Screenshot number~08 is intentionally absent from the sequence because the
+planned controlled-alert capture was not retained. The numbering is preserved
+rather than revised retrospectively. Screenshots~11 and~12 provide useful
+concurrent visual context, but the proof-of-concept launch shown in them has no
+embedded timestamp. Consequently, the alert timestamp cannot be subtracted
+from a verified execution timestamp to produce a measured detection latency.
+
+The public SHA-256 manifests were also rechecked during report preparation.
+All listed detector source, service, machine-readable artifacts, rules, and
+screenshots used here matched their recorded digests. The two explanatory
+\code{README.md} files---the main detection README and the YARA-comparison
+README---did not match the digests listed for them. They are therefore treated
+as supporting documentation, not as integrity-verified evidence. The
+experimental claims below rely on the separately verified artifacts, source,
+rule, and captures.
+
+The term \emph{behavioural detection} is used in a host-centric sense in this
+chapter: a decision is based on a security-relevant state transition produced
+by the tested technique, rather than on the name or exact bytes of the program
+that initiated it. MORI observes an effect of the behaviour, not the complete
+causal chain. It can report that a protected executable no longer matches its
+known-good mounted-view content, but that alert alone cannot attribute the
+change specifically to Copy Fail.
+
+\subsection{Observable Stages and Detection Value}
+
+The reproduction exposed several possible observation points. Their defensive
+value depends on whether they are direct evidence of exploitation, merely a
+precondition, or an outcome that occurs after the security boundary has
+already been crossed. \Cref{tab:detection-opportunities} distinguishes these
+roles.
+
+\begin{table}[H]
+    \centering
+    \caption{Candidate observables and their value in the tested attack path.}
+    \label{tab:detection-opportunities}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        Observable & Experimental status & Detection assessment \\
+        \midrule
+        Vulnerable kernel and loaded \code{algif\_aead} &
+        Both states were recorded before controlled reproduction. &
+        Useful exposure context, but neither state proves malicious activity
+        and legitimate workloads may require the interface. \\
+
+        AF\_ALG, pipe, \code{splice}, and AEAD sequence &
+        Established by the analysed technique, but not directly traced during
+        the integrity-monitor run. &
+        Potentially useful for selective correlation; not validated as a
+        runtime detector in this phase. \\
+
+        Changed privileged-file content through the mounted view &
+        Repeatedly observed for \code{/usr/bin/su} and captured by MORI. &
+        Strong, sample-independent integrity signal for covered targets, but
+        cause-agnostic and detected only after the changed view exists. \\
+
+        Unchanged size, owner, and mode &
+        Recorded alongside the changed digest in Chapter~5. &
+        Demonstrates that metadata-only monitoring would miss the observed
+        content change. \\
+
+        Execution producing UID~0 &
+        Directly shown by \code{id} and \code{whoami}. &
+        High-confidence confirmation of impact, but too late to be a preventive
+        signal in the demonstrated sequence. \\
+
+        Mounted/backing-view divergence and reboot recovery &
+        Preserved in the reproduction evidence. &
+        Valuable diagnostic context for the transient effect; unsuitable as a
+        lightweight continuous detector in the form tested. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The module and kernel observations are useful for exposure management. A host
+running an affected kernel with \code{algif\_aead} available presents the
+tested preconditions, whereas a corrected kernel or an effective module-loading
+restriction changes that exposure. These are configuration findings rather
+than exploit alerts: the interface may be loaded for legitimate cryptographic
+use, and an affected kernel can remain idle indefinitely.
+
+The syscall-level sequence is closer to attacker activity, but individual
+operations are not necessarily unique to Copy Fail. A high-fidelity detector
+would need to correlate operation type, ordering, process or thread context,
+target relationship, and timing while retaining negative controls for benign
+AF\_ALG and pipe use. The dataset in this phase does not perform that
+correlation. Treating the analysed sequence as already validated telemetry
+would therefore overstate the evidence.
+
+The mounted-view digest deviation was the strongest directly tested detection
+opportunity. It occurred on the protected side of the interaction, after the
+untrusted process had influenced a privileged target but without requiring
+knowledge of how the initiating script was named, encoded, or launched. The
+same observation appeared in the preliminary investigation, the preserved
+reproduction, and the monitored detection test. This supports repeatability on
+the same reconstructed guest; it is not a statistical success-rate measurement
+across hosts or workloads.
+
+\subsection{Privileged Target Surface and Known-Good Baseline}
+
+The initial target inventory identified 13 root-owned SUID files on the tested
+filesystem. From the UID~1001 \code{labuser} account, 12 were recorded as both
+readable and executable. The remaining file,
+\code{/usr/lib/dbus-1.0/dbus-daemon-launch-helper}, was readable but not
+executable in that account context. The experimentally demonstrated target was
+\code{/usr/bin/su}; the other reachable SUID files were treated as candidate
+privileged targets, not as individually proven Copy Fail targets.
+
+Executables carrying Linux file capabilities were inventoried separately. They
+were not added to this first MORI baseline. The distinction matters because the
+inventory described a broader privileged-execution surface than the monitor
+actually covered. A clean result from MORI therefore means only that the 12
+listed SUID paths matched their expected content at the time of a scan.
+
+The baseline stored one SHA-256 digest and one absolute path per monitored
+file. For \code{/usr/bin/su}, the expected value was:
+
+\begin{lstlisting}
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+\end{lstlisting}
+
+The complete baseline file had the following digest:
+
+\begin{lstlisting}
+c5ebe8afe16326aea860317b153981a43e57f3d462c3e1d03d3d1bbe5d951e74
+\end{lstlisting}
+
+Its operational copy was placed at
+\code{/etc/copyfail-detector/suid-known-good.tsv}. The preserved deployment
+record shows a root-owned directory and a baseline file with mode
+\code{-rw-r--r--}, owner \code{root}, group \code{root}, and size
+1,016~bytes. An accompanying screenshot records a \code{labuser} modification
+attempt being denied. The machine-readable artifact establishes the ownership
+and mode; the denied write is screenshot evidence rather than a separately
+preserved command transcript.
+
+Root ownership prevents the ordinary test account from silently replacing the
+expected values under the recorded permissions, but it is not a complete trust
+solution. The baseline must already be correct when generated, legitimate
+package updates require controlled regeneration, and an attacker who has
+obtained unrestricted root access may be able to alter the baseline, detector,
+service definition, or retained logs. MORI's baseline is consequently a
+laboratory known-good reference, not an externally attested measurement.
+
+Content hashing was selected because Chapter~5 showed that the target's size,
+ownership, and SUID mode remained at their original values while its
+mounted-view digest changed. A metadata-only watch would therefore have
+reported no relevant difference in that run. Conversely, a digest mismatch
+establishes only that the bytes returned by the monitored read differ; it does
+not identify the changed offsets, explain their semantics, or prove whether
+the persistent backing data was replaced.
+
+\subsection{MORI Integrity Monitor and Service Deployment}
+
+The detector implementation was intentionally small so that its decision could
+be traced directly. At start-up, it loads the protected TSV baseline. It then
+opens each listed path through the ordinary filesystem interface, reads it in
+65,536-byte chunks, calculates SHA-256, and compares the result with the
+expected digest. The tested logic can be represented as:
+
+\begin{lstlisting}
+baseline = load protected path-to-hash mappings
+repeat:
+    for each protected path:
+        observed = SHA256(read path through normal filesystem view)
+        if a new mismatch is observed: emit ALERT
+        if a previous mismatch has cleared: emit RECOVERED
+    sleep 0.25 seconds
+\end{lstlisting}
+
+Reading through the normal filesystem path is central to this experiment. It
+places the monitor on the same mounted/VFS view that returned the changed
+digest during reproduction. MORI does not inspect the proof-of-concept process
+or calculate the proof-of-concept's hash; it repeatedly measures the protected
+target content instead.
+
+The set of paths currently in alert state suppresses identical messages on
+every scan and permits a later recovery message if a target again matches its
+baseline. Missing or unreadable files enter a separate error path. The
+implementation does not cryptographically protect its journal output, stop a
+changed file from being executed, quarantine a process, or restore target
+content. Its decision is a binary equality test against the configured
+baseline.
+
+MORI was deployed as a \code{systemd} service with output directed to the
+system journal. The service used \code{DynamicUser=yes} and
+\code{NoNewPrivileges=yes}, together with a strict read-only system view,
+private temporary and device namespaces, kernel and control-group protection,
+and \code{RestrictSUIDSGID=yes}. These settings reduce the monitor's own
+privilege and writable surface while still allowing it to read the
+world-readable protected executables. They do not make the service or journal
+tamper-proof against an already privileged attacker.
+
+The status artifact records the service as enabled and active, with the Python
+monitor running under PID~3992. Its startup journal entries state:
+
+\begin{lstlisting}
+[2026-08-09T15:27:04.563102+00:00] Watching 12 privileged files
+[2026-08-09T15:27:04.563133+00:00] Baseline: /etc/copyfail-detector/suid-known-good.tsv
+[2026-08-09T15:27:04.563143+00:00] Check interval: 0.25 seconds
+\end{lstlisting}
+
+At the later status capture, the service had been active for approximately
+1~hour 12~minutes and reported 6.0~MiB of memory, a 6.5~MiB peak, and
+52.947~seconds of accumulated CPU time. These values show that the service was
+operational for more than an immediate demonstration, but they are a single
+status observation rather than a controlled performance benchmark. No disk-I/O
+profile, workload comparison, or production-scale target count was measured.
+
+The nominal 0.25-second sleep is likewise not a measured maximum alert delay.
+Each scan also requires the time needed to open and hash all listed files, and
+the scheduler may add further delay. A sufficiently short-lived mismatch could
+occur entirely between observations. Event-driven monitoring or kernel-level
+telemetry could reduce that polling limitation, but neither was evaluated by
+this detector.
+
+\subsection{Controlled Detection Result}
+
+With the service running on VM~271, the Copy Fail proof of concept was executed
+again from the unprivileged \code{labuser} account. Before the monitored
+execution, \code{/usr/bin/su} matched the known-good digest. MORI subsequently
+emitted the following journal record:
+
+\begin{lstlisting}
+[2026-08-09T15:32:31.501808+00:00] ALERT
+path=/usr/bin/su
+expected=c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+observed=44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9
+\end{lstlisting}
+
+The expected value is the original digest recorded before exploitation. The
+observed value is the same changed mounted-view digest documented in the
+preserved reproduction. This agreement links the detector decision to the
+previously characterised host-side effect without requiring the monitor to
+recognise the initiating sample.
+
+Screenshots~11 and~12 place the journal alert next to the
+\code{labuser} execution terminal. Screenshot~11 shows the proof-of-concept
+command returning a \code{\#} prompt; screenshot~12 adds the explicit identity
+checks:
+
+\begin{lstlisting}
+# id
+uid=0(root) gid=1001(labuser) groups=1001(labuser),100(users)
+# whoami
+root
+\end{lstlisting}
+
+As in Chapter~5, the prompt alone is not treated as proof of privilege. The
+\code{id} and \code{whoami} output establish the UID~0 outcome. The journal
+artifact independently preserves the mismatch event, while the screenshot
+provides the concurrent visual relationship between alert and successful
+exploitation.
+
+\begin{table}[H]
+    \centering
+    \caption{Result of the monitored Copy Fail execution.}
+    \label{tab:mori-detection-result}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.29\textwidth}Y@{}}
+        \toprule
+        Question & Direct result & Interpretation \\
+        \midrule
+        Was the protected target changed in the monitored view? &
+        MORI reported the documented expected and changed digests for
+        \code{/usr/bin/su}. &
+        Yes, for the covered target and the tested execution. \\
+
+        Did detection depend on the PoC filename or hash? &
+        The detector read only its target baseline and protected paths. &
+        No; its decision was independent of the initiating sample's identity. \\
+
+        Was privilege escalation prevented? &
+        The adjacent identity checks returned UID~0 and \code{root}. &
+        No; the alert was visibility into a successful exploit. \\
+
+        Was detection latency measured? &
+        The alert has a journal timestamp, but the visible launch does not. &
+        No defensible time-to-alert value can be calculated. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+No false-positive rate can be derived from this single targeted experiment.
+The clean-state captures show that the baseline could be loaded and monitored
+without an immediate alert, and the later status record shows no additional
+preserved mismatch beyond the \code{/usr/bin/su} event. They do not constitute
+a representative benign workload trial. Legitimate package replacement,
+administrative maintenance, or any other change to a covered executable would
+also produce a digest mismatch until the baseline was reviewed and updated.
+
+\subsection{Exact-Sample YARA Comparison}
+
+The comparison experiment used YARA~4.5.0 on the same
+\code{6.8.0-116-generic} environment. Its test rule imported YARA's
+\code{hash} module and matched only when the complete scanned file had the
+known proof-of-concept SHA-256 digest:
+
+\begin{lstlisting}
+d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61
+\end{lstlisting}
+
+The original 731-byte laboratory sample was scanned without being executed.
+At \code{2026-08-09 19:10:18 UTC}, the output recorded:
+
+\begin{lstlisting}
+CopyFail_Known_PoC_Exact_Hash /home/labuser/copy_fail_exp.py
+yara exit=0
+\end{lstlisting}
+
+A private copy was then changed only by appending one trailing newline. Its
+size became 732~bytes and its SHA-256 digest became:
+
+\begin{lstlisting}
+a567d09b15f6e4440e70c9f2aa8edec8ed59f53301952df05c719aa3911687f9
+\end{lstlisting}
+
+The modified file was not executed. At
+\code{2026-08-09 19:14:21 UTC}, the exact-hash rule returned no match. The
+experiment therefore proves that this particular exact-sample signature
+identified the byte-for-byte sample for which it was written and failed after
+a trivial byte-level change. It does not prove that the modified file remained
+operational, evaded a more general rule, or would evade other static, semantic,
+or behavioural detection methods.
+
+This narrow result must not be generalised into a criticism of YARA itself.
+YARA rules may use strings, byte patterns, structural properties, modules, and
+compound conditions rather than a whole-file digest. The comparison isolates
+the limitation of exact-sample identity: it answers whether the scanned bytes
+are the one known artifact, not whether the host has experienced the
+security-relevant effect associated with Copy Fail.
+
+MORI makes the opposite trade-off. It does not identify the initiating program
+at all. A renamed, re-encoded, or otherwise byte-different implementation would
+remain outside the detector's concern if it produced no protected-target
+change. If it did cause a covered SUID executable to differ from its
+known-good mounted-view content for long enough to be scanned, MORI would make
+the same comparison regardless of the initiating filename, language, or hash.
+That generalisation across initiators is useful, while the loss of causal
+specificity remains an operational limitation.
+
+\subsection{Limitations and Answers to RQ2 and RQ3}
+
+The detection result is affirmative but deliberately bounded. The principal
+limitations are:
+
+\begin{itemize}
+    \item
+    only \code{/usr/bin/su} was experimentally demonstrated as a Copy Fail
+    target; the other baseline entries are coverage candidates rather than
+    individually validated exploit targets;
+
+    \item
+    the baseline covered 12 readable and executable root-owned SUID files, not
+    file-capability executables, every privileged program, or arbitrary target
+    paths;
+
+    \item
+    polling can miss an integrity deviation that begins and ends between
+    complete scans, and the 0.25-second sleep is not a measured alert latency;
+
+    \item
+    a digest mismatch is cause-agnostic and may also result from an authorised
+    update, corruption, or another attack technique;
+
+    \item
+    the detector alerts after the changed target view exists and did not stop
+    the demonstrated UID~0 transition;
+
+    \item
+    no syscall or kernel trace directly validated the proposed lower-level
+    correlation signals during this monitored run;
+
+    \item
+    no representative benign-workload corpus, false-positive rate,
+    multi-host trial matrix, or controlled performance benchmark was collected;
+    and
+
+    \item
+    baseline, detector, and journal trust may be lost after unrestricted root
+    compromise unless measurements and alerts are protected or exported
+    independently.
+\end{itemize}
+
+Within those limits, RQ2 can be answered by separating consistently observed
+effects from merely promising telemetry. On the tested VM, the changed
+mounted-view content of \code{/usr/bin/su} was the most consistently reproduced
+and directly useful system-level detection opportunity. It was visible in the
+preliminary investigation, the preserved reproduction, and the monitored
+detection run, while size, ownership, and permissions remained unchanged.
+The resulting UID~0 identity was a reliable impact confirmation but occurred
+too late to support prevention. Vulnerable-kernel and module state supplied
+exposure context, whereas the lower-level AF\_ALG and \code{splice}
+correlation remained a design candidate rather than a validated detector in
+this phase.
+
+RQ3 can also be answered affirmatively for the demonstrated target and
+laboratory conditions. MORI detected the exploitation effect without matching
+the proof-of-concept filename, programming language, executable hash, or exact
+file contents. The one-byte YARA comparison reinforces why that distinction
+matters: the exact-hash rule ceased to match after a trivial, non-executed
+variation, whereas MORI's decision was anchored to the protected target's
+deviation from known-good state.
+
+The answer is not that MORI uniquely identifies Copy Fail. It detects a
+security-relevant integrity violation consistent with the reproduced
+technique. Attribution would require additional correlation, and timely
+prevention requires a control placed earlier in the attack path. The next
+chapter therefore moves from observing the changed privileged target to
+evaluating a compensating control intended to interrupt the known exploitation
+sequence before the privilege boundary is crossed.
