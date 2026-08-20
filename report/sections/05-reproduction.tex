@@ -381,3 +381,232 @@ UID~1001 \code{labuser} context on the reconstructed vulnerable runtime
 produced a shell whose identity checks returned UID~0 and \code{root}. The
 controlled reproduction therefore demonstrated the intended local privilege
 escalation without relying on the changed target digest as a proxy for success.
+
+\subsection{Post-Exploitation Mounted-View State}
+
+Evidence item~05 was captured at \code{2026-08-08 23:24:57 UTC}, after the
+privileged shell shown in evidence item~03 had been exited. The text artifact
+and accompanying screenshot record the following state:
+
+\begin{lstlisting}
+6.8.0-116-generic
+uid=1001(labuser) gid=1001(labuser) groups=1001(labuser),100(users)
+labuser
+-rwsr-xr-x root root 55680 /usr/bin/su
+44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9  /usr/bin/su
+\end{lstlisting}
+
+The identity output shows that the interactive session had returned to
+UID~1001 and that \code{whoami} again resolved to \code{labuser}. The target
+remained owned by \code{root:root}, retained its set-user-ID mode, and remained
+55,680~bytes in size. These metadata values match the pre-exploitation capture.
+The observable difference was the byte stream returned through the normal
+mounted path, whose SHA-256 digest remained the changed value first shown in
+evidence item~03.
+
+Leaving the UID~0 shell therefore did not immediately restore the original
+mounted view of \code{/usr/bin/su}. This continued observation is distinct from
+post-exploitation persistence in the usual security sense: no mechanism was
+installed to survive reboot, retain privileged access, or automatically
+re-establish the altered state. It records only that the changed mounted-view
+content remained visible after the privileged shell had ended and while the
+system continued running.
+
+The unchanged size, ownership, and permission bits also show why metadata-only
+monitoring would not have captured the observed content change in this run.
+Conversely, the changed digest proves only that the bytes returned through that
+path differed from the baseline. A cryptographic hash does not reveal the
+number, positions, or meaning of the differing bytes, and it does not by itself
+identify whether the persistent-storage representation changed.
+
+This post-exploitation capture consequently establishes an intermediate state:
+the test user was again non-root, the privileged target retained its original
+filesystem metadata, and the altered mounted-view digest remained observable.
+The next comparison tests whether the same changed bytes were also returned
+when the target was read through a separate backing-filesystem path.
+
+\subsection{Mounted-View and Backing-Filesystem Comparison}
+
+Evidence item~06 was captured at \code{2026-08-08 23:28:41 UTC}. The same
+\code{6.8.0-116-generic} kernel remained active. The normal mounted path was
+hashed again and compared with a read performed directly against the ext4
+filesystem on the underlying logical volume. The evidence documentation records
+the diagnostic command as:
+
+\begin{lstlisting}
+sudo debugfs -R 'cat /usr/bin/su' \
+  /dev/mapper/ubuntu--vg-ubuntu--lv 2>/dev/null \
+  | sha256sum
+\end{lstlisting}
+
+This administrative diagnostic was performed after the UID~0 result and did
+not contribute to the privilege transition. Its purpose was to compare two
+ways of reading the same logical target. The preserved results were:
+
+\begin{lstlisting}
+Mounted/VFS view:
+44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9  /usr/bin/su
+
+ext4 backing filesystem view:
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  -
+\end{lstlisting}
+
+The mounted/VFS access path continued to return the changed digest, whereas the
+\code{debugfs} read returned the original digest recorded before exploitation.
+The two access paths therefore produced different byte streams at the time of
+the comparison. This is consistent with the published Copy Fail mechanism, in
+which a file's cached representation can be modified without the corresponding
+change being written back to the persistent filesystem
+\cite{copyfail-research}.
+
+The experiment nevertheless distinguishes that interpretation from what the
+artifact proves directly. No kernel instrumentation captured the relevant page
+objects, dirty-state flags, scatterlists, or writeback decisions during this
+comparison. The evidence therefore establishes an access-path divergence; it
+does not independently identify the page cache as the causal storage location
+or reconstruct the internal kernel state responsible for the different reads.
+
+The \code{debugfs} result is also a point-in-time read from a live laboratory
+filesystem rather than a complete forensic disk image or an offline filesystem
+verification. No concurrent modification of the target was intentionally
+performed during the comparison, but the result should not be expanded into a
+claim about every block, cache layer, or filesystem object in the guest.
+
+Within those limits, evidence item~06 supports the narrower and experimentally
+important conclusion: the altered content was observable through the mounted
+path while the separate ext4 read still returned the original target content.
+This explains why the changed mounted-view digest alone was not classified as
+proof of a persistent on-disk replacement.
+
+\subsection{Recovery After Reboot into the Same Vulnerable Kernel}
+
+The final preserved phase tested whether the altered mounted view remained
+after a reboot. The first recovery screenshot was captured at
+\code{2026-08-08 23:30:53 UTC} and records the active release and target digest
+as:
+
+\begin{lstlisting}
+6.8.0-116-generic
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+\end{lstlisting}
+
+A separate machine-readable recovery artifact was captured later, at
+\code{2026-08-08 23:36:42 UTC}. It again records
+\code{6.8.0-116-generic}, identifies the active session as the
+\code{researcher} account, and preserves the target state as:
+
+\begin{lstlisting}
+-rwsr-xr-x root root 55680 /usr/bin/su
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b  /usr/bin/su
+\end{lstlisting}
+
+The screenshot and text artifact are therefore two post-reboot observations,
+not duplicate representations of one simultaneous command. Both show that the
+normal mounted path had returned to the original digest, while the later text
+capture additionally confirms the original size, ownership, and set-user-ID
+mode. The account used for the recovery check differs from the exploitation
+subject, but that identity difference does not alter the target-path digest
+being compared.
+
+Because the running release remained \code{6.8.0-116-generic}, restoration did
+not depend on installing or booting a corrected kernel. Under the tested
+conditions, rebooting into the same vulnerable release removed the previously
+observable mounted-view divergence. This result is consistent with a transient
+in-memory modification and with the original bytes remaining available from
+the backing filesystem during evidence item~06.
+
+Recovery of the target view is not equivalent to remediation. The same
+vulnerable kernel and loadable module path remained present after reboot, so the
+laboratory conditions required for another reproduction could be restored. A
+reboot can clear the observed transient state, but it does not correct the
+kernel flaw or provide a durable security boundary.
+
+The preserved recovery records do not include a boot identifier, an uptime
+comparison, or a reboot-journal excerpt. The reboot event is therefore supplied
+by the documented experimental sequence rather than independently proven by
+those two captures alone. The captures directly establish only the state shown
+after the declared reboot: the same vulnerable kernel was active and the
+mounted target once again produced its original digest.
+
+\subsection{Reproduction Result and Answer to RQ1}
+
+The controlled sequence provides a coherent before, execution, and recovery
+record. VM~271 began the preserved run on the reconstructed
+\code{6.8.0-116-generic} runtime with \code{labuser} at UID~1001 and a
+root-owned SUID target whose mounted-view digest matched the original value.
+After the required modules were loaded by the separate \code{researcher}
+account, the proof of concept was launched from the \code{labuser} prompt
+without an explicit privilege-granting wrapper. The resulting shell returned
+UID~0 and \code{root}.
+
+The post-exploitation captures then showed that the session could return to
+UID~1001 while the changed target digest remained observable through the
+mounted path. A separate ext4 read returned the original digest, and a reboot
+into the same vulnerable kernel restored the original mounted-view digest. The
+principal findings and their evidential limits are summarised in
+\cref{tab:reproduction-findings}.
+
+\begin{table}[H]
+    \centering
+    \caption{Claim-to-evidence summary for the controlled reproduction.}
+    \label{tab:reproduction-findings}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        Finding & Direct support & Evidential boundary \\
+        \midrule
+        Vulnerable runtime reconstructed &
+        Active release and matching \code{6.8.0-116.116} package records &
+        Classification applies to the tested Ubuntu Noble configuration. \\
+
+        Ordinary-user starting state &
+        Evidence item~01 records \code{labuser} at UID~1001 &
+        The identity listing does not enumerate every possible authorization
+        mechanism. \\
+
+        UID~0 transition achieved &
+        Evidence item~03 records \code{id} and \code{whoami} returning
+        UID~0 and \code{root} &
+        Screenshot-only evidence; the primary group remained GID~1001 rather
+        than changing to GID~0. \\
+
+        Mounted view changed &
+        Evidence items~03 and~05 record the changed target digest &
+        A changed hash does not identify the altered bytes or prove an on-disk
+        replacement. \\
+
+        Access paths diverged &
+        Evidence item~06 records different mounted/VFS and ext4-read digests &
+        Internal page-cache and writeback state were not directly instrumented. \\
+
+        Original view recovered &
+        Evidence item~07 records the original digest on the same vulnerable
+        release after the declared reboot &
+        Recovery is not remediation, and the captures do not independently
+        prove the reboot event. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+RQ1 asks whether Copy Fail can be reproduced reliably in the isolated
+laboratory by an ordinary, unprivileged local user. For the tested configuration,
+the result supports an affirmative answer: the preserved run begins with the
+dedicated test account at UID~1001 and records the proof-of-concept execution
+producing a UID~0 shell. The preliminary investigation and the restarted final
+run both produced the expected changed mounted view, while the final run
+preserved the direct UID~0 validation.
+
+The word \emph{reliably} remains bounded by the experimental design. The public
+evidence does not contain a multi-host trial matrix, a success/failure count, or
+a statistical timing analysis. It demonstrates operational repeatability on
+the same reconstructed VM and a directly validated privilege transition in the
+preserved run; it does not quantify an exploit success rate across other
+kernels, hardware, workloads, or timing conditions.
+
+The UID~0 result, rather than the changed file digest, is the decisive answer to
+RQ1. The digest sequence provides supporting behavioural context and shows that
+the mounted-view alteration was transient under the tested recovery procedure.
+With reproduction established, the following chapter examines which parts of
+this sequence are consistently observable and which can serve as behavioural
+detection opportunities without depending on the specific proof-of-concept
+filename or hash.

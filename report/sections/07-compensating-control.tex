@@ -1,0 +1,840 @@
+\section{Custom Compensating Control: MORI}
+\label{sec:compensating-control}
+
+Chapter~6 demonstrated that the integrity monitor could recognise a changed
+privileged target without identifying the proof-of-concept sample. That result
+provided visibility, but it occurred after the protected file view had already
+changed and did not prevent the resulting UID~0 transition. RQ4 therefore moves
+the defensive decision earlier in the path: can a temporary control interrupt
+the known exploitation sequence while the vulnerable kernel is still in use,
+and can it avoid removing benign functionality that is not required to be
+denied?
+
+The experiment approached this question in two stages. MORI Guard v1 applied a
+broad module-loading restriction to \code{algif\_aead}. It stopped the tested
+proof of concept on kernel \code{6.8.0-116-generic}, but a benign unprivileged
+AF\_ALG AEAD bind failed for the same reason. The result was useful as a safe
+baseline: it showed that removing access to the complete interface interrupted
+the path, while also making the compatibility cost directly visible.
+
+MORI v2 was then developed as a more selective eBPF and Linux Security Module
+(LSM) control. Rather than classifying any one syscall as malicious, it combined
+AF\_ALG AEAD activity, a root-owned SUID-file-to-pipe splice, and the associated
+privileged-file read in a shared process and thread context. The implementation
+was introduced through observation-only checkpoints, negative controls, a
+shadow policy, active denial, structured telemetry, adversarial regression
+testing, and finally a lifecycle correction in MORI v2.7.
+
+The final control returned \code{EPERM} at the privileged-file permission check
+inside the correlated splice operation. The preserved final validation shows
+the frozen v2.7 executable denying both the laboratory Python proof of concept
+and an independently implemented C proof of concept. In both tests,
+\code{labuser} remained UID~1001 and the SHA-256 digest of \code{/usr/bin/su}
+remained equal to its known-good value. The result is deliberately narrower
+than a claim of universal prevention: MORI v2.7 enforces an experimentally
+derived policy for the tested same-process Copy Fail paths and remains a
+compensating control rather than a correction to the kernel defect.
+
+This chapter documents the control objective, evidential boundary, broad v1
+baseline, incremental v2 development, final enforcement architecture,
+lifecycle regression, compatibility controls, adversarial validation, and
+remaining limitations. It concludes by answering RQ4 and establishing the
+boundary for the vendor comparison in Chapter~8.
+
+\subsection{Control Objective, Success Criteria, and Evidence Boundary}
+
+The compensating-control objective was not merely to make the public Python
+script terminate with an error. A useful result had to show where the
+interruption occurred, preserve the unprivileged identity, protect the selected
+SUID target, and distinguish selective prevention from wholesale interface
+removal. The evaluation criteria are summarised in
+\cref{tab:mori-success-criteria}.
+
+\begin{table}[H]
+    \centering
+    \caption{Success criteria used for the custom compensating control.}
+    \label{tab:mori-success-criteria}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.30\textwidth}Y@{}}
+        \toprule
+        Criterion & Required observation & Evidential meaning \\
+        \midrule
+        Known path interrupted &
+        The tested proof of concept receives a denial before obtaining a
+        privileged shell. &
+        Demonstrates prevention for that execution path, not correction of the
+        underlying vulnerability. \\
+
+        Privilege boundary preserved &
+        Post-test identity remains \code{uid=1001(labuser)}. &
+        Excludes an apparent error followed by a successful UID~0 transition. \\
+
+        Privileged target preserved &
+        \code{/usr/bin/su} retains the known-good mounted-view SHA-256 digest. &
+        Shows that the selected target did not enter the changed state observed
+        in Chapter~5. \\
+
+        Benign interface use retained &
+        An unprivileged AF\_ALG AEAD control can still reach the tested
+        socket, bind, or accept operation. &
+        Distinguishes selective enforcement from disabling
+        \code{algif\_aead}; it does not prove a complete cryptographic
+        round trip. \\
+
+        Individual signals remain permitted &
+        AEAD-only, splice-only, and deliberately separated process activity do
+        not reach the deny condition. &
+        Tests whether the control enforces the correlation rather than treating
+        every prerequisite as malicious. \\
+
+        Reproduced defect is regression-tested &
+        A test that bypasses an earlier policy version is retained and repeated
+        against the corrected candidate. &
+        Demonstrates that the final change addresses the observed lifecycle
+        failure rather than only changing labels or telemetry. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The Phase~04 package contains several evidence classes. MORI Guard v1 is
+preserved through machine-readable configuration, blocker source, deployment
+state, compatibility output, final retest output, journal events, and
+screenshots. MORI v2 preserves complete implementation checkpoints from
+v2.2.0 through v2.6.2, screenshots for the earlier v2.1.x work, final v2.7
+source and build objects, and the regression and proof-of-concept captures.
+This progression is important because the failed designs and compatibility
+results are part of the control evaluation rather than discarded development
+noise.
+
+The current MORI v2 public manifest contains 108 SHA-256 entries. It includes
+the historical checkpoints, the v2.7 source and build set, the current
+provenance records, and screenshots~00--57, with the two \code{37a} and
+\code{37b} captures retained separately. The older inner
+\code{mori-v2/README.md} still reports an 85-object inventory from the earlier
+v2.6.2 package. It is therefore used for historical design notes rather than as
+the final inventory. The manifest and the current Phase~04 index are the
+authoritative package boundaries used in this chapter.
+
+The frozen v2.7 executable is identified by:
+
+\begin{lstlisting}
+7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039
+\end{lstlisting}
+
+That digest is visible before the final Python validation and is repeated in
+the frozen artifact manifest and later provenance record. The associated
+source files are preserved with the following digests:
+
+\begin{lstlisting}
+05e0a387ce084d2aef121351c9af7907f85696307d9f08ccdf6d9191f91a035d
+    source/mori_observer.bpf.c
+2ee01194b488e757dd4c1062a4123aec8aac5c5cbd74767ebc3a938f886939e6
+    source/mori_observer.c
+\end{lstlisting}
+
+One chronology boundary must be kept explicit. The final artifact-provenance
+record was captured later, when the host reported kernel
+\code{6.8.0-137-generic}. It verifies the hashes of the transferred frozen
+source and build set; it is not used as evidence of the earlier mitigation-test
+kernel. The v1 machine-readable retest and v2.6.2 pre-test capture directly
+record \code{6.8.0-116-generic}. The final v2.7 captures identify the tested
+binary by hash and show the denial and post-test state, but do not repeat
+\code{uname}. The project chronology places those captures in Phase~04 before
+the separate vendor-remediation validation. This distinction prevents the
+later provenance environment from being substituted for the actual test
+sequence.
+
+The evidence supports conclusions about the two tested proof-of-concept
+implementations and the stated regression controls. It does not establish a
+population-wide prevention rate, production compatibility, or protection
+against every possible variation of the vulnerability.
+
+\subsection{MORI Guard v1: Broad Interruption and Compatibility Cost}
+
+MORI Guard v1 used the normal \code{modprobe} configuration mechanism to
+redirect requests for \code{algif\_aead} to a root-owned blocker script:
+
+\begin{lstlisting}
+install algif_aead /usr/local/sbin/mori-block-algif-aead
+\end{lstlisting}
+
+The blocker wrote a structured journal entry, printed the presentation message
+to the requesting process when possible, and exited with status~1. The
+deployment record shows that \code{modprobe -n -v algif\_aead} resolved to the
+custom command, that \code{algif\_aead} was not loaded, and that the existing
+MORI integrity monitor remained active. This was an administrative loading
+policy, not a change to the vulnerable kernel code.
+
+The final v1 retest was performed by \code{labuser} on
+\code{6.8.0-116-generic}. Before the attempt, the account was UID~1001 and
+\code{/usr/bin/su} had its expected digest:
+
+\begin{lstlisting}
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+\end{lstlisting}
+
+The proof of concept terminated with \code{FileNotFoundError}, returned exit
+status~1, and did not produce a privileged shell. The post-attempt identity
+remained \code{labuser}, the target digest was unchanged, and
+\code{algif\_aead} remained blocked. The journal recorded the blocker decision,
+while the integrity-monitor query returned no event because the protected
+target did not change. Within the normal module-loading path exercised by the
+test, v1 therefore interrupted the known exploit prerequisite before the
+privilege boundary was crossed.
+
+The same mechanism also exposed its compatibility cost. A separate unprivileged
+control attempted to bind an AF\_ALG AEAD socket to \code{gcm(aes)}. With v1
+active, it failed with \code{FileNotFoundError}, \code{errno=2}, and
+\code{No such file or directory}. The failure was expected, but it established
+that the control could not distinguish the Copy Fail sequence from a benign
+consumer requesting the same kernel interface.
+
+\begin{table}[H]
+    \centering
+    \caption{Security and compatibility result of MORI Guard v1.}
+    \label{tab:mori-v1-result}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+        \toprule
+        Test & Direct result & Interpretation \\
+        \midrule
+        Python Copy Fail retest &
+        PoC failed; UID remained 1001; target hash unchanged. &
+        The tested path was interrupted while the vulnerable kernel was
+        retained. \\
+
+        Benign \code{gcm(aes)} AEAD bind &
+        Failed while the guard was active. &
+        The protection was obtained by removing the tested interface from both
+        malicious and benign callers. \\
+
+        MORI integrity monitor &
+        No target-mismatch event. &
+        Consistent with prevention before the monitored target changed; not an
+        independent proof of why the PoC failed. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The result answers only the first half of RQ4. MORI Guard v1 prevented the
+known execution path, but it did so by imposing the exact broad functionality
+loss that the second half of the question asks the project to avoid. It
+therefore became the compatibility baseline and the motivation for MORI v2.
+
+The scope of the v1 mechanism is also narrower than the phrase ``module
+disabled'' may imply. The test validated normal \code{modprobe} resolution
+while the module was unloaded. It did not show prevention of direct insertion
+by an already privileged administrator, protection when the functionality is
+built into the kernel, or resistance to a root user changing the configuration
+and blocker script. Those are acceptable boundaries for the temporary
+laboratory control, but they prevent it from being described as a kernel fix.
+
+\subsection{From a False Positive to a Selective Policy}
+
+MORI v2 did not begin as an enforcement engine. It was developed by first
+observing each candidate signal, then testing whether state could be shared
+between hooks, and only later converting the correlation into a denial. The
+development sequence is summarised in
+\cref{tab:mori-development-progression}.
+
+\begin{table}[H]
+    \centering
+    \caption{MORI v2 development and the question answered at each checkpoint.}
+    \label{tab:mori-development-progression}
+    \scriptsize
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.10\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}Y@{}}
+        \toprule
+        Version & Change & Experimental lesson \\
+        \midrule
+        v2.1 & Observe non-root reads of root-owned SUID files through
+        \code{lsm/file\_permission}. &
+        MORI Monitor's legitimate periodic hashing immediately triggered the
+        observer; a SUID read alone was too broad. \\
+
+        v2.1.1 & Add a \code{trusted\_tgids} map populated from the monitor's
+        service cgroup. &
+        The known monitor could be suppressed, while an untrusted SUID read
+        remained visible. Cgroup membership alone was still an incomplete
+        trust decision. \\
+
+        v2.1.2 & Authenticate the monitor path, file type, owner, permissions,
+        SHA-256 digest, cgroup membership, and exact argv entry. &
+        Tampering caused trust to be refused. MORI still attached with an empty
+        exemption map, making the monitor observable rather than silently
+        trusting it. \\
+
+        v2.2 & Observe AF\_ALG \code{aead} bind attempts through
+        \code{lsm/socket\_bind}. &
+        The hook could see the candidate signal. With v1 disabled, an
+        unprivileged \code{gcm(aes)} bind also succeeded, demonstrating that
+        observation need not remove the interface. \\
+
+        v2.3 & Record recent AEAD state by TGID and correlate it with a SUID
+        read over an experimental ten-second interval. &
+        Same-process temporal correlation worked and expired as designed, but
+        time proximity did not establish malicious intent. \\
+
+        v2.4 & Observe root-owned SUID-file-to-pipe operations at
+        \code{fentry/do\_splice} and share state with the LSM program. &
+        Cross-hook state was visible during the same operation; AEAD, splice,
+        and SUID-read signals could be combined for one TGID. \\
+
+        v2.5 & Emit \code{WOULD-DENY-}\allowbreak
+        \code{AEAD-SPLICE-SUID} while preserving the original LSM return value. &
+        The combined path reached the shadow decision, while AEAD-only and
+        splice-only controls remained allowed. \\
+
+        v2.6 & Return \code{-EPERM} for the validated correlation. &
+        The benign AEAD bind succeeded, but the correlated SUID-to-pipe splice
+        was denied with \code{errno=1}. \\
+
+        v2.6.1 & Add a BPF ring buffer containing timestamp, TGID, UID, and
+        event type. &
+        Userspace received structured deny telemetry, while enforcement
+        remained independent of successful event delivery. \\
+
+        v2.6.2 & Add best-effort interactive-terminal notification and extend
+        adversarial and target regression testing. &
+        The presentation path was separated from the LSM decision. Later
+        testing also exposed a same-TGID expiry weakness in the timed state. \\
+
+        v2.7 & Replace the enforcement timer with socket-lifetime AEAD state and
+        exact-invocation splice state. &
+        The retained 12-second regression was denied, followed by final Python
+        and independent C proof-of-concept validation. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The first false positive was valuable because it prevented the SUID-read signal
+from becoming an unquestioned enforcement rule. The integrity monitor performed
+exactly the same low-level action that the prototype observed: it read
+root-owned SUID executables. Suppressing it by a hard-coded PID, process name,
+or UID would have created a weak exemption. The final userspace loader instead
+required a root-owned regular monitor file, no group or world write bit, the
+expected SHA-256 digest, an exact command-line argument, and membership in the
+dedicated service cgroup before populating the trusted map.
+
+This trust mechanism is an exemption, not the source of the security decision.
+If verification fails, MORI emits a warning, attaches its BPF programs, and
+leaves the trust map empty. That behaviour favours continued observation over a
+silent exemption. It can produce additional monitor noise, but it does not
+disable the compensating control simply because the companion monitor could not
+be authenticated.
+
+The shadow-policy stage provided a second safety boundary. The combined rule
+was allowed to reach a \code{WOULD-DENY} state before any operation was
+rejected. AEAD-only and SUID-splice-only negative controls did not reach that
+state, whereas the deliberately combined sequence did. Only after this policy
+shape was visible did v2.6 change the LSM return value to \code{-EPERM}.
+Consequently, active denial was based on a previously observed correlation
+rather than introduced at the same time as the first multi-hook test.
+
+\subsection{MORI v2.7 Enforcement Architecture}
+
+The frozen v2.7 candidate consists of a userspace loader and a CO-RE BPF object.
+The loader opens and loads the object, authenticates the optional MORI Monitor
+exemption, attaches the BPF programs, and polls a ring buffer for deny events.
+The kernel-side programs make the enforcement decision. The four principal
+state maps are shown in \cref{tab:mori-v27-state}.
+
+\begin{table}[H]
+    \centering
+    \caption{Kernel-side state used by MORI v2.7.}
+    \label{tab:mori-v27-state}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+        \toprule
+        Map & Key and value & Purpose \\
+        \midrule
+        \code{trusted\_tgids} & TGID $\rightarrow$ one-byte trust flag &
+        Suppresses reads from the authenticated MORI integrity-monitor process. \\
+
+        \code{aead\_socket\_state} & BPF socket-local storage $\rightarrow$
+        owner TGID, state, and counted flag &
+        Associates an observed AF\_ALG AEAD socket with the process that bound
+        it and follows the tracked socket until release. \\
+
+        \code{active\_aead\_tgids} & TGID $\rightarrow$ active-socket count &
+        Allows enforcement to ask whether the current process owns at least one
+        live tracked AEAD socket. \\
+
+        \code{splice\_active\_tids} & TID $\rightarrow$ one-byte active flag &
+        Exists only while that exact thread is inside a qualifying
+        root-SUID-file-to-pipe \code{do\_splice} invocation. \\
+
+        \code{events} & Ring-buffer records &
+        Carries timestamp, TGID, UID, and deny type to userspace on a
+        best-effort basis. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+At \code{lsm/socket\_bind}, MORI first preserves any non-zero decision returned
+by a previous LSM program. It then checks for address family~38 (AF\_ALG) and
+an algorithm type whose fixed field begins with \code{aead}. The tracked socket
+is associated with the current TGID, and the process's active-AEAD count is
+incremented. A separate \code{lsm/socket\_accept} program reports an accept only
+when the parent socket already carries MORI state. At
+\code{fentry/\_\_sock\_release}, the active count is decremented and the
+socket-local state is destroyed with the socket.
+
+The implementation therefore makes the lifetime of the tracked socket, rather
+than a fixed number of seconds, the relevant AEAD state. The accept event is
+useful telemetry, but the frozen source activates and counts the state in the
+bind hook. This distinction matters because \code{socket\_bind} observes the
+attempt before userspace independently confirms successful completion; it is
+retained as a limitation later in this chapter.
+
+At \code{fentry/do\_splice}, the program checks that the caller is non-root,
+the input inode is root-owned and carries the owner SUID bit, and the output
+inode is a FIFO. If those conditions hold, the current TID is inserted into
+\code{splice\_active\_tids}. The corresponding \code{fexit/do\_splice}
+program deletes that entry. The state is thus scoped to the exact thread and
+the exact invocation instead of remaining available for a grace period after
+the operation.
+
+The decision point is \code{lsm/file\_permission}. For a non-root read of a
+root-owned SUID file, the program first checks the trusted-monitor exemption.
+It then looks for both of the following:
+
+\begin{lstlisting}
+active_aead_tgids[current TGID] > 0
+splice_active_tids[current TID] == 1
+\end{lstlisting}
+
+When both are present, MORI submits a ring-buffer event if space is available,
+writes a trace message, and returns \code{-1}, corresponding to
+\code{-EPERM}. If either condition is absent, the previous LSM result is
+preserved. The policy interrupts the file read used inside the qualifying
+splice; it does not wait for the later page-cache change or privileged-program
+execution observed in Chapters~5 and~6.
+
+The tested policy boundary is summarised in
+\cref{tab:mori-v27-policy-boundary}.
+
+\begin{table}[H]
+    \centering
+    \caption{Decision boundary implemented by the frozen MORI v2.7 source.}
+    \label{tab:mori-v27-policy-boundary}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.43\textwidth}>{\bfseries\raggedright\arraybackslash}p{0.16\textwidth}Y@{}}
+        \toprule
+        Observed condition & Decision & Reason \\
+        \midrule
+        Ordinary socket activity or non-AEAD AF\_ALG activity & Allowed &
+        No tracked AEAD socket is created by the tested predicate. \\
+
+        AF\_ALG AEAD activity without a qualifying splice & Allowed &
+        The splice-invocation state is absent. \\
+
+        Root-owned SUID file spliced to a pipe without same-process active AEAD
+        state & Allowed &
+        The active-AEAD count is absent or zero. \\
+
+        AEAD activity in process A and SUID-to-pipe splice in process B &
+        Allowed &
+        AEAD state is isolated by TGID rather than correlated across processes. \\
+
+        Live tracked AEAD socket in the same TGID, with the current TID inside
+        the qualifying splice and reading the SUID input & Denied with EPERM &
+        Both enforcement states are present at the protected read. \\
+
+        Authenticated MORI Monitor read & Allowed &
+        The trusted TGID exemption is evaluated before correlation. \\
+
+        Root caller & Allowed by this policy &
+        The control is designed to interrupt the pre-escalation non-root path,
+        not constrain an already privileged process. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Structured telemetry is deliberately downstream of the decision. If the ring
+buffer is full or the userspace process is unavailable, reservation can fail,
+but the LSM program still returns \code{EPERM}. When userspace does receive the
+event, it prints the TGID and UID and optionally searches
+\code{/proc/<tgid>/fd/} for descriptors~2, 1, and~0. Each candidate is opened
+independently and checked with \code{isatty()} before the cosmetic MORI message
+is written. Failure to find or write a terminal changes neither the kernel
+decision nor the denied process's return value.
+
+\subsection{Regression-Driven Lifecycle Correction}
+
+MORI v2.6.2 used timestamps keyed by TGID. AEAD state and splice state were
+considered relevant only within an experimental ten-second interval. That
+design passed the original short positive tests, but later adversarial testing
+kept the same process and AEAD socket alive, waited 12~seconds, and then spliced
+\code{/usr/bin/fusermount3} into a pipe. The trace showed the expected AEAD and
+splice observations, yet userspace reported:
+
+\begin{lstlisting}
+same-TGID expiry test: tgid=8358
+AEAD armed; waiting 12 seconds...
+splice allowed after expiry: 32 bytes
+\end{lstlisting}
+
+This was a reproduced bypass of the selected v2.6.2 policy. It was not a
+separate demonstration of UID~0 or target corruption, but it proved that the
+timer could expire while the relevant socket and process remained active. The
+control had therefore encoded elapsed time rather than the lifecycle of the
+operation it was trying to constrain.
+
+The first v2.7 lifecycle candidate was also retained rather than treated as a
+successful fix. It recorded an \code{AEAD-CANDIDATE} and the later splice, but
+the active state did not reach the permission decision; after the same
+12-second delay, 32~bytes were still spliced. This intermediate failure showed
+that merely adding socket-local state was insufficient unless the state
+transition consulted by enforcement matched the AF\_ALG socket behaviour in
+the test.
+
+The frozen v2.7 source corrected the design in two ways:
+
+\begin{enumerate}
+    \item
+    the AEAD association is counted for the lifetime of the tracked bound
+    socket and released during socket teardown, with elapsed time retained only
+    for event timestamps; and
+
+    \item
+    the splice flag is keyed by TID and exists only between
+    \code{fentry/do\_splice} and \code{fexit/do\_splice} for that exact
+    invocation.
+\end{enumerate}
+
+The retained regression again kept the AEAD operation socket open and waited
+12~seconds before attempting the same SUID-to-pipe splice. This time the trace
+contained \code{AEAD-ACTIVE}, \code{SPLICE-ARM}, and
+\code{DENY-AEAD-SPLICE-SUID}; userspace received:
+
+\begin{lstlisting}
+v2.7 lifecycle regression: tgid=9531
+AEAD socket active; waiting 12 seconds...
+splice blocked: errno=1 (Operation not permitted)
+\end{lstlisting}
+
+The result addresses the specific expiry defect because the same delayed
+sequence changed from allowed to denied after lifecycle state replaced the
+timer. It does not prove that every socket-transfer, fork, exec, concurrency,
+or teardown case is correct. Those cases were outside the preserved regression
+matrix.
+
+Cross-TGID isolation remained intentional. A v2.6.2 control held AEAD state in
+one process while another process spliced the SUID target; the second process
+successfully moved 32~bytes. The final v2.7 source retains process ownership for
+AEAD state, so it does not create a host-wide correlation merely because two
+unrelated processes perform the individual operations. This reduces broad
+coupling between benign workloads, while also defining an evasion boundary if
+an untested exploit implementation can distribute the required sequence across
+processes.
+
+\subsection{Adversarial Validation of the Frozen Candidate}
+
+The final validation used the v2.7 executable whose digest begins
+\code{7fe7b609}. The capture shows the userspace loader verifying the MORI
+Monitor file, trusting TGID~702, attaching the enforcement engine, and
+announcing that selective policy and structured telemetry were active. The
+same executable remained running for the final Python and independent C tests;
+the Phase~04 index records that it was not rebuilt between them.
+
+\subsubsection{Python proof of concept}
+
+The actual Python execution was performed after switching into the unprivileged
+\code{labuser} account. A preliminary command in the same capture used an
+incorrect home-directory expansion and failed before the test; it is not
+counted as the security result. During the subsequent execution from
+\code{/home/labuser}, the BPF trace recorded the following lifecycle for the
+same TGID and TID:
+
+\begin{lstlisting}
+AEAD-ACTIVE
+AEAD-ACCEPT-OBSERVED
+SPLICE-ARM
+DENY-AEAD-SPLICE-SUID
+SPLICE-DISARM ret=-1
+AEAD-RELEASE
+\end{lstlisting}
+
+The proof of concept was stopped by the LSM decision:
+
+\begin{lstlisting}
+PermissionError: [Errno 1] Operation not permitted
+\end{lstlisting}
+
+MORI userspace received the structured deny event for UID~1001 and delivered
+the optional terminal notification. The security-relevant result is the LSM
+\code{EPERM}; the message is presentation only.
+
+Post-test validation recorded \code{labuser} as UID~1001 and returned the
+known-good digest for \code{/usr/bin/su}:
+
+\begin{lstlisting}
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+\end{lstlisting}
+
+The target therefore did not enter the changed mounted-view state used by MORI
+Monitor in Chapter~6, and the test did not produce the UID~0 outcome seen during
+the unmitigated reproduction.
+
+\subsubsection{Independent C proof of concept}
+
+The second validation used a separately implemented C proof of concept. Its
+preserved provenance records the following identifiers:
+
+\begin{lstlisting}
+commit  ba3f503b1497350a2df3a89fab0427b4f868fe59
+source  e1dec1348c0d43ab47d8f992d9a0336216fd37ff83e6fa1d9e39a80890fbd165
+binary  3b2605dc5e820f40645f682385194469f9189cbb65ee99153b52aedf45be5706
+\end{lstlisting}
+
+Some provenance commands at the top of the combined validation capture were
+run from the wrong directory and failed. They are not used for these values;
+the separate provenance capture records the successful commit and hash output.
+
+The C test reported that its first attempted write failed. The trace again
+showed \code{AEAD-ACTIVE}, an observed accept, \code{SPLICE-ARM}, the v2.7
+deny event, splice disarm with return value~$-1$, and AEAD release. After the
+test, the account remained UID~1001 and \code{/usr/bin/su} retained the same
+known-good digest. No privileged shell was observed.
+
+\begin{table}[H]
+    \centering
+    \caption{Final adversarial results for the frozen MORI v2.7 candidate.}
+    \label{tab:mori-v27-adversarial-results}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.20\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}Y@{}}
+        \toprule
+        Test & Denial observation & Post-test identity and target & Conclusion \\
+        \midrule
+        Python PoC &
+        Correlated splice returned \code{EPERM}; matching kernel and ring-buffer
+        events were visible. &
+        UID~1001; \code{/usr/bin/su} hash matched baseline. &
+        Known Python path prevented. \\
+
+        Independent C PoC &
+        First attempted write failed after the matching v2.7 deny lifecycle. &
+        UID~1001; \code{/usr/bin/su} hash matched baseline. &
+        Second implementation path prevented. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The two implementations reduce dependence on one script's error handling or
+layout. They do not make the sample size large and do not establish resistance
+to all Copy Fail variants. The strongest supported statement is that the same
+frozen v2.7 candidate interrupted both tested same-process paths before the
+documented target change and privilege transition.
+
+\subsection{Compatibility and Negative Controls}
+
+Compatibility was evaluated incrementally rather than inferred from the final
+denial alone. The most important contrast is between v1 and v2: v1 made even a
+benign \code{gcm(aes)} bind unavailable, whereas the v2 series kept
+\code{algif\_aead} loaded and allowed the tested benign AEAD operation before
+selectively denying the correlated SUID splice.
+
+The preserved controls are summarised in
+\cref{tab:mori-compatibility-controls}. Version labels are retained because not
+every earlier negative control was repeated in a separate capture against the
+frozen v2.7 binary.
+
+\begin{table}[H]
+    \centering
+    \caption{Compatibility, negative, and regression controls across MORI development.}
+    \label{tab:mori-compatibility-controls}
+    \scriptsize
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.12\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.20\textwidth}Y@{}}
+        \toprule
+        Version & Control & Direct result & Meaning \\
+        \midrule
+        v1 & Unprivileged \code{gcm(aes)} AF\_ALG AEAD bind & Failed &
+        Broad interface removal imposed a demonstrated compatibility cost. \\
+
+        v2.2 & Same benign AEAD bind with v1 disabled & Succeeded and was
+        observed &
+        Observation did not itself require disabling AEAD. \\
+
+        v2.5 & AEAD-only and SUID-splice-only shadow tests & Allowed; no
+        \code{WOULD-DENY} &
+        Neither individual signal was sufficient for the selected policy. \\
+
+        v2.6 & Combined enforcement test & AEAD bind succeeded; correlated
+        splice returned \code{EPERM} &
+        The denial boundary could be placed after benign interface access. \\
+
+        v2.6.2 & Cross-TGID AEAD and splice & Splice allowed &
+        State was isolated by process rather than combined host-wide. \\
+
+        v2.6.2 & SUID-target sweep & Attempts were denied; ten recorded target
+        hashes remained unchanged &
+        The predicate was not hard-coded only to \code{/usr/bin/su}; this was a
+        v2.6.2 regression, not a universal target claim. \\
+
+        v2.6.2 & Same-TGID operation after 12-second delay & Splice allowed &
+        Reproduced a timer-based policy bypass. \\
+
+        v2.7 & Same delayed lifecycle regression & Splice denied with
+        \code{EPERM} &
+        Socket-lifetime state addressed the reproduced expiry defect. \\
+
+        v2.7 & Python and independent C PoCs & Both denied &
+        The frozen candidate interrupted both final implementation paths. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The ten-target post-sweep capture lists \code{chfn}, \code{chsh},
+\code{fusermount3}, \code{gpasswd}, \code{mount}, \code{newgrp},
+\code{passwd}, \code{su}, \code{sudo}, and \code{umount} as unchanged. The
+test demonstrates that the root-owner and SUID predicates could operate across
+multiple recorded targets and that those targets retained their baseline
+digests after the denied operations. It does not show that each program is an
+independently exploitable Copy Fail target.
+
+The benign AEAD evidence must also be interpreted narrowly. The v2.2 control
+established a successful unprivileged \code{gcm(aes)} bind, and later controls
+recorded bind and accept availability where stated. The dataset does not
+preserve a complete encryption/decryption round trip or a representative
+application workload. ``Benign functionality preserved'' therefore means that
+MORI v2 did not remove the tested AF\_ALG AEAD interface operations and left
+the isolated negative controls available. It does not mean that every legitimate
+AEAD consumer was tested or that the control has zero compatibility impact.
+
+\subsection{Operational and Security Limitations}
+
+MORI v2.7 is an experimental, privileged, host-local compensating control. Its
+result is useful because it is selective relative to v1, but several boundaries
+prevent it from being treated as a general Linux exploit-prevention system.
+
+\begin{itemize}
+    \item
+    \textbf{The vulnerable code remains present.} MORI denies an observed
+    combination before the tested exploit reaches its target; it does not
+    correct the \code{algif\_aead} implementation. Detaching the BPF programs,
+    changing the loader, or booting without the required policy restores the
+    underlying exposure.
+
+    \item
+    \textbf{The policy recognises behaviour, not intent.} AF\_ALG AEAD use and
+    SUID-to-pipe splice activity can each be legitimate. A benign program that
+    reproduces the complete same-process and same-thread combination may receive
+    \code{EPERM}.
+
+    \item
+    \textbf{Process isolation creates an evasion boundary.} AEAD state is
+    associated with an owner TGID. Cross-TGID activity is intentionally allowed.
+    An untested implementation able to divide the required operations between
+    processes, transfer descriptors, or otherwise change ownership semantics
+    may fall outside the policy.
+
+    \item
+    \textbf{Bind observation precedes independent success confirmation.} The
+    frozen source increments active state in \code{lsm/socket\_bind}. A later
+    accept is separately observed, but enforcement consults the count created
+    at bind. A failed bind whose socket remains open can therefore create
+    conservative state until release. This was not evaluated across a corpus of
+    failing benign applications.
+
+    \item
+    \textbf{Thread and lifecycle coverage is tested, not exhaustive.} TID-scoped
+    splice state improves the precision of the permission decision, but fork,
+    exec, descriptor passing, multithreaded races, abnormal teardown, and PID or
+    TGID reuse were not subjected to a complete regression matrix.
+
+    \item
+    \textbf{Map-update failures allow the operation.} Source review shows that
+    failure to allocate or update the active-AEAD or splice state is logged and
+    the original operation is preserved. This avoids turning internal pressure
+    into an uncontrolled system-wide denial, but it is fail-open for the
+    compensating policy.
+
+    \item
+    \textbf{Monitor trust is local and start-up based.} The loader authenticates
+    the monitor file and current service-cgroup processes before inserting TGIDs.
+    The preserved source does not demonstrate continuous revalidation or removal
+    of a trusted entry when the process lifecycle changes.
+
+    \item
+    \textbf{Telemetry is best-effort.} Ring-buffer exhaustion or userspace
+    failure does not weaken a decision whose state was successfully created, but
+    it can remove structured context and the optional TTY notification. Kernel
+    trace output is also diagnostic rather than an independently protected audit
+    trail.
+
+    \item
+    \textbf{Deployment depends on kernel facilities.} The tested design requires
+    BPF LSM attachment, BTF/CO-RE information, the selected LSM and fentry hooks,
+    and sufficient administrative privilege. The frozen provenance records
+    clang~18.1.3 and libbpf~1.3.0, but no cross-distribution, cross-architecture,
+    or production-kernel portability matrix was collected.
+
+    \item
+    \textbf{Performance and false-positive rates were not measured.} The
+    experiment contains targeted positive and negative controls, not a sustained
+    representative workload, controlled overhead benchmark, or statistical
+    false-positive study.
+
+    \item
+    \textbf{The final evidence remains bounded.} Two proof-of-concept
+    implementations, one principal target, an alternate target, and the stated
+    regression suite improve confidence in the selected path. They do not prove
+    protection against every algorithm, target, sequencing variation, or future
+    exploitation technique.
+\end{itemize}
+
+The attacker-facing message deserves no separate security credit. It is useful
+for demonstrating that the structured event reached userspace, but it also
+reveals that a policy intervened and depends on access to an interactive
+terminal. Removing it would not change the LSM result; losing it does not mean
+the denial failed.
+
+These limitations do not invalidate the experiment. They define what the
+control achieved: a narrower temporary denial than complete interface removal,
+with a documented policy, reproducible negative controls, a retained bypass,
+and a regression-tested correction. They also explain why a vendor kernel fix
+remains the preferred remediation.
+
+\subsection{Answer to RQ4 and Transition to Vendor Comparison}
+
+RQ4 asks whether a defensive control can interrupt the known exploitation path
+before the kernel is patched and whether it can do so without unnecessarily
+removing benign functionality. The experiments produce two different answers.
+
+MORI Guard v1 answers the prevention part affirmatively but the compatibility
+part negatively. On the vulnerable \code{6.8.0-116-generic} runtime, it kept
+\code{algif\_aead} unavailable through the tested \code{modprobe} path, caused
+the Python PoC to fail, preserved UID~1001, and kept \code{/usr/bin/su}
+unchanged. The same restriction also caused the benign \code{gcm(aes)} bind to
+fail. It interrupted the exploit by removing the complete tested interface.
+
+The final MORI v2.7 result supports an affirmative but bounded answer to both
+parts. The frozen candidate left AF\_ALG AEAD available in the exercised
+controls and allowed individual or cross-process signals that did not satisfy
+the policy. It denied the correlated SUID-to-pipe operation with \code{EPERM}
+for both the Python and independent C proof-of-concept paths. After each test,
+\code{labuser} remained UID~1001 and the selected privileged target retained
+its known-good digest. The retained 12-second regression also shows that the
+final lifecycle design corrected a specific bypass present in v2.6.2.
+
+The qualifier is essential. MORI v2.7 preserves more benign functionality than
+v1 because it does not remove the AEAD interface and does not deny every
+individual prerequisite. It does not establish that all benign applications
+remain unaffected, and process separation, state-allocation failure, lifecycle
+edge cases, or a variant outside the selected correlation may evade it. The
+appropriate conclusion is therefore:
+
+\begin{lstlisting}
+For the tested same-process Copy Fail paths in the Phase 04 laboratory,
+MORI v2.7 interrupted exploitation before privilege escalation while
+preserving the benign interface operations and negative controls that
+were exercised. It is a selective compensating control, not a patch and
+not proof of universal prevention.
+\end{lstlisting}
+
+This chapter deliberately stops short of answering RQ5. MORI Guard v1 and
+Canonical's temporary mitigation both restrict \code{algif\_aead}, whereas
+MORI v2.7 attempts a narrower behavioural decision inside the active interface.
+Chapter~8 compares those approaches directly: what each blocks, what each
+preserves, the trust and deployment assumptions each introduces, and why the
+custom result does not replace vendor-supported remediation.
