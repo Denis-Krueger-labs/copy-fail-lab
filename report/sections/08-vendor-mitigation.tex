@@ -1,0 +1,545 @@
+\section{Vendor Mitigation and Comparative Evaluation}
+\label{sec:vendor-mitigation}
+
+Chapter~7 showed that a custom compensating control could interrupt the tested
+Copy Fail paths while the vulnerable kernel remained active. It also showed why
+the word \emph{custom} matters. MORI Guard v1 achieved broad prevention by
+removing access to \code{algif\_aead}, whereas MORI v2.7 preserved the tested
+interface operations by enforcing a narrower behavioural correlation. RQ5 now
+places those results beside Canonical's temporary response:
+
+\begin{quote}
+\textbf{RQ5 -- Vendor Comparison.} How does the custom compensating control
+compare with Canonical's temporary mitigation, which prevents
+\code{algif\_aead} from being loaded?
+\end{quote}
+
+The comparison is not a contest in which the most selective mechanism wins by
+definition. A broad vendor mitigation may be preferable because it is simple,
+packaged, supportable, and intentionally conservative. A selective research
+control may preserve more functionality, but only within the behaviour and
+environment that its policy actually recognises. The evaluation must therefore
+consider prevention scope, compatibility, operational complexity, evidential
+strength, telemetry, and the route back to an ordinary patched system.
+
+The resulting answer is deliberately asymmetric. MORI Guard v1 belongs to the
+same policy class as Canonical's temporary mitigation and offers no compatibility
+advantage over it. MORI v2.7 demonstrates that the tested exploitation path can
+be interrupted without removing the tested AF\_ALG AEAD operations, but it does
+so with narrower assurance and substantially greater implementation and
+deployment complexity. Neither custom control corrects the kernel defect, and
+neither should displace the vendor kernel update as the final remediation.
+
+\subsection{Comparison Objective and Evidence Boundary}
+
+The comparison uses three evidence classes. First, Canonical's security notice
+and technical guidance define the purpose, package version, deployment action,
+compatibility warning, and intended lifetime of the temporary mitigation
+\cite{ubuntu-copyfail-fixes,ubuntu-copyfail-cve}. Second, Phase~01 records the
+policy as it appeared on the preserved Ubuntu reference guest. Third, Phase~04
+contains the direct vulnerable-kernel experiments for MORI Guard v1 and MORI
+v2.7.
+
+These classes answer different questions. Vendor documentation states what the
+distribution intended to deploy. Phase~01 shows the effective module-resolution
+rule on the reference system. Phase~04 shows what happened when the laboratory's
+custom controls were exercised on \code{6.8.0-116-generic}. None of these alone
+creates a perfectly matched head-to-head trial.
+
+In particular, the Canonical \code{kmod} policy was captured on a reference
+guest whose running \code{6.8.0-137-generic} kernel was already corrected. A
+Copy Fail execution on that combined state would have had two independent
+reasons to fail: the ordinary module-loading path was restricted and the kernel
+contained the vendor correction. The project therefore did not use that guest
+as a causal exploit test for the temporary mitigation. By contrast, MORI Guard
+v1 was directly tested on \code{6.8.0-116-generic}, and the Phase~04 chronology
+places the final MORI v2.7 validation before vendor remediation. The final v2.7
+captures identify the frozen binary and result but do not repeat \code{uname};
+their kernel attribution is therefore sequence-based rather than a repeated
+runtime capture.
+
+The comparison criteria are summarised in \cref{tab:vendor-comparison-criteria}.
+
+\begin{table}[H]
+    \centering
+    \caption{Criteria used for the vendor-mitigation comparison.}
+    \label{tab:vendor-comparison-criteria}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}Y@{}}
+        \toprule
+        Criterion & Question & Boundary \\
+        \midrule
+        Prevention scope &
+        Which prerequisite or behaviour is denied? &
+        Broader coverage can reduce evasion space while increasing collateral
+        impact. \\
+
+        Compatibility &
+        Which benign operations remain available? &
+        Only operations actually exercised by the preserved controls are
+        credited. \\
+
+        Evidential strength &
+        Was the result directly tested on the vulnerable runtime or inferred
+        from the mechanism and vendor record? &
+        Mechanism-based confidence is kept separate from experimental causality. \\
+
+        Operational burden &
+        What must be installed, loaded, maintained, and recovered? &
+        Laboratory feasibility does not establish production suitability. \\
+
+        Observability &
+        What security-relevant context accompanies a denial? &
+        Telemetry is useful, but it does not compensate for an incomplete
+        prevention boundary. \\
+
+        Remediation lifecycle &
+        How is the control retired after a fixed kernel is active? &
+        A temporary control should have a clear and supportable exit path. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+This boundary prevents two overstatements. The chapter does not claim that the
+Canonical rule was independently proven as the sole cause of exploit failure
+on the vulnerable laboratory kernel. It also does not treat the successful
+MORI v2.7 controls as proof that every legitimate AF\_ALG workload remains
+compatible or that every Copy Fail implementation is recognised.
+
+\subsection{Canonical's Temporary \texttt{kmod} Mitigation}
+
+Canonical published \code{kmod} updates on 30 April 2026 to block loading of
+the affected \code{algif\_aead} module until kernel updates became available.
+For Ubuntu 24.04 LTS Noble, the mitigation-bearing package version was
+\code{31+20240202-2ubuntu7.2} \cite{ubuntu-copyfail-fixes}. Canonical's manual
+equivalent writes the following \code{modprobe} install rule:
+
+\begin{lstlisting}
+install algif_aead /bin/false
+\end{lstlisting}
+
+An install rule substitutes the specified command for the module insertion
+performed through normal \code{modprobe} resolution. Requests may still resolve
+the dependency path, but the \code{algif\_aead} insertion itself is replaced by
+\code{/bin/false}. The mechanism does not inspect the caller, target file,
+splice activity, or intended cryptographic operation. It removes the affected
+module from that ordinary loading path for every caller.
+
+The rule is preventive only when the module is not already active. Canonical's
+guidance therefore instructs administrators to unload \code{algif\_aead} when
+possible or reboot when the module is in use. The same guidance warns that
+applications may fall back to userspace cryptography, but that the fallback is
+not guaranteed and already running applications may be affected
+\cite{ubuntu-copyfail-fixes}. This is not an incidental weakness in the
+mitigation; it is the explicit trade-off of removing an attack surface before a
+corrected kernel can be deployed.
+
+\subsubsection{Observed reference-system policy}
+
+Phase~01 captured the following state on the Ubuntu reference guest:
+
+\begin{lstlisting}
+kmod                                  31+20240202-2ubuntu7.2
+linux-image-6.8.0-137-generic         6.8.0-137.137
+
+/etc/modprobe.d/disable-algif_aead.conf:
+install algif_aead /bin/false
+\end{lstlisting}
+
+The corresponding dry run resolved to insertion of the dependency
+\code{af\_alg} followed by \code{install /bin/false}; the module-state capture
+contained no loaded \code{algif\_aead} entry. The installed kernel configuration
+also recorded \code{CONFIG\_CRYPTO\_USER\_API\_AEAD=m}, so the affected
+interface was a loadable module on this system rather than compiled directly
+into the kernel.
+
+This evidence confirms the effective policy and its suitability for the
+captured Ubuntu configuration. It does not establish resistance to an
+administrator deliberately changing the configuration, nor does it test every
+low-level way privileged code might be introduced. Those cases fall outside the
+unprivileged local-attacker model used by the project. More importantly for RQ5,
+the capture proves policy presence and resolution behaviour, not a standalone
+vulnerable-kernel exploit result.
+
+\subsubsection{Intended lifetime}
+
+Canonical described the \code{kmod} change as temporary and recommended
+upgrading to a fixed kernel and rebooting. Its published Noble generic-kernel
+boundary identifies \code{6.8.0-117.117} as fixed
+\cite{ubuntu-copyfail-cve}. Once a corrected kernel is active, the loading rule
+is no longer required and may itself become an unnecessary compatibility
+restriction. Canonical's guidance consequently includes a documented route for
+disabling the mitigation after the kernel update
+\cite{ubuntu-copyfail-fixes}.
+
+This lifecycle is a significant operational advantage. The mitigation is
+distributed through the ordinary package channel, tied to a vendor advisory,
+and explicitly superseded by a kernel update. Its purpose is emergency risk
+reduction, not permanent replacement of AF\_ALG AEAD.
+
+\subsection{Relationship to MORI Guard v1}
+
+MORI Guard v1 used the same system mechanism but redirected the module request
+to a laboratory blocker:
+
+\begin{lstlisting}
+install algif_aead /usr/local/sbin/mori-block-algif-aead
+\end{lstlisting}
+
+The blocker returned failure, wrote a structured journal event, and attempted
+to present the MORI message to the requesting process. On
+\code{6.8.0-116-generic}, the Python proof of concept failed, \code{labuser}
+remained UID~1001, and \code{/usr/bin/su} retained its known-good digest. A
+separate unprivileged \code{gcm(aes)} bind also failed while the guard was
+active.
+
+At the policy level, Canonical's mitigation and MORI Guard v1 are therefore
+equivalent in breadth for the tested Ubuntu module configuration: both replace
+ordinary loading of \code{algif\_aead} with a failing command. The custom script
+changes the presentation and evidence available to the laboratory, not the
+fundamental compatibility boundary. Both deny malicious and benign callers
+before either can use the module.
+
+There are nevertheless operational differences:
+
+\begin{itemize}
+    \item Canonical's rule arrives in a signed distribution package and is
+    documented as part of the vendor response. MORI Guard v1 is a locally
+    authored configuration and script whose review, deployment, and removal
+    remain the operator's responsibility.
+
+    \item MORI Guard v1 emits a dedicated journal record and a recognisable
+    presentation message. Canonical's rule provides a generic command failure;
+    the vendor guidance does not define equivalent structured Copy Fail deny
+    telemetry.
+
+    \item MORI Guard v1 was directly exercised against the vulnerable kernel in
+    the laboratory. The captured Canonical rule was validated on the already
+    patched reference guest and is supported by the vendor's stated mechanism,
+    not by an otherwise identical laboratory exploit trial.
+
+    \item Both depend on the module being absent when enforcement begins. A
+    loading rule does not retroactively detach an active module, so operational
+    validation must include module state or a reboot.
+\end{itemize}
+
+For an ordinary Ubuntu deployment awaiting a kernel update, MORI Guard v1 does
+not offer a security or compatibility reason to replace the vendor package. Its
+additional value is limited to the research environment, where the custom
+blocker made the control decision visible and provided a locally controlled
+comparison baseline.
+
+\subsection{Relationship to MORI v2.7}
+
+MORI v2.7 begins from the opposite compatibility decision. It leaves
+\code{algif\_aead} available and denies only when the tested same-process
+correlation reaches the protected privileged-file read. The frozen candidate
+combines live AEAD socket state, exact-invocation SUID-file-to-pipe splice
+state, a non-root read of the selected class of root-owned SUID file, and an
+authenticated monitor exemption.
+
+This design produced two useful differences from the module-level controls:
+
+\begin{enumerate}
+    \item The unprivileged \code{gcm(aes)} socket, bind, and later recorded
+    accept operations remained available where tested. AEAD-only and
+    splice-only negative controls did not reach the deny decision.
+
+    \item A matched decision produced \code{EPERM} together with kernel trace
+    output and a structured ring-buffer event containing the TGID, UID,
+    timestamp, and deny type. The telemetry exposed why the policy intervened
+    rather than only reporting that module insertion failed.
+\end{enumerate}
+
+The selectivity is real within the preserved test matrix, but it changes the
+assurance model. Canonical's mitigation prevents the complete module-dependent
+path through ordinary module resolution. MORI v2.7 must correctly observe and
+correlate the exploit's behaviour. A variant that separates work across
+processes, changes ownership semantics, avoids a monitored hook, or falls
+outside the selected SUID-to-pipe sequence may evade the policy. Conversely, a
+legitimate program that reproduces the full correlation may receive
+\code{EPERM}.
+
+MORI v2.7 also introduces dependencies that the \code{kmod} rule does not have:
+BPF LSM support, BTF and CO-RE information, the selected LSM and tracing hooks,
+a privileged userspace loader, map allocation, state lifecycle correctness,
+and optional monitor authentication. The Phase~04 source review further shows
+that state-map update failures preserve the original operation. That choice
+avoids turning allocation pressure into an uncontrolled denial of service, but
+it is fail-open for the compensating policy.
+
+The appropriate conclusion is therefore not that selective correlation is
+strictly better than broad removal. MORI v2.7 trades some breadth and
+operational simplicity for retained tested functionality and richer decision
+context. Whether that exchange is acceptable depends on the system's workload,
+kernel facilities, risk tolerance, and the length of time for which the
+vulnerable kernel must remain in service.
+
+\subsection{Security Coverage and Failure Modes}
+
+The three controls can be ordered by where they intervene, but not by a single
+universal measure of strength. \Cref{tab:vendor-security-comparison} separates
+the supported security claims.
+
+\begin{table}[H]
+    \centering
+    \caption{Security boundary of the temporary controls.}
+    \label{tab:vendor-security-comparison}
+    \scriptsize
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+        \toprule
+        Dimension & Canonical \code{kmod} mitigation & MORI Guard v1 & MORI v2.7 \\
+        \midrule
+        Intervention point &
+        Normal \code{modprobe} resolution for \code{algif\_aead}. &
+        Same resolution path, redirected to a custom blocker. &
+        Correlated privileged-file read inside a qualifying splice operation. \\
+
+        Protected scope &
+        All callers that require the blocked module through the captured loading
+        path. &
+        Same broad module dependency for the tested laboratory path. &
+        Tested same-process AEAD, SUID-to-pipe splice, and privileged-read
+        sequence. \\
+
+        Vulnerable code removed &
+        No. Access is restricted while the vulnerable kernel may remain. &
+        No. The vulnerable kernel is deliberately retained. &
+        No. The policy denies selected behaviour before the target changes. \\
+
+        Direct vulnerable-kernel PoC evidence &
+        Not isolated as the sole variable in this laboratory. &
+        Python path blocked on \code{6.8.0-116-generic}. &
+        Python and independent C paths denied in Phase~04 before vendor
+        remediation; the final captures do not repeat \code{uname}. \\
+
+        Principal bypass boundary &
+        Module already active or loading outside the validated ordinary path. &
+        Same, plus local script and configuration integrity. &
+        Behaviour outside the selected hooks, state, process ownership, or
+        lifecycle model. \\
+
+        False-positive surface &
+        Any benign caller requiring the module. &
+        Any benign caller requiring the module. &
+        A benign caller reproducing the full correlated sequence. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+For the public proof of concept's known dependency, module-level removal has a
+simple advantage: the exploit cannot reach \code{algif\_aead} through the
+validated loading route. There is no correlation window, per-process state, or
+target predicate to evade. The cost is equally simple: neither can a benign
+caller reach that module through the same route.
+
+MORI v2.7 narrows both the denial and the supported prevention statement. Its
+two final proof-of-concept results, negative controls, target sweep, and retained
+lifecycle regression increase confidence in the tested path. They do not equal
+the coverage obtained by removing the prerequisite interface. This distinction
+matters most during emergency response, where predictable containment may be
+more valuable than preserving a specialised interface for a short period.
+
+\subsection{Compatibility, Operations, and Telemetry}
+
+Compatibility evidence is intentionally graded rather than binary. Canonical
+warned that applications should fall back to userspace cryptography but may not
+implement that fallback. The project did not infer successful application
+behaviour from the word \emph{should}. MORI Guard v1 directly demonstrated the
+loss of one benign unprivileged \code{gcm(aes)} bind. MORI v2.7 preserved the
+tested socket, bind, and accept operations, but the preserved Phase~04 controls
+do not contain a complete encryption and decryption round trip or a
+representative application workload.
+
+The result is a bounded compatibility ordering:
+
+\begin{lstlisting}
+Canonical kmod mitigation / MORI Guard v1
+    tested interface removed through normal module resolution
+
+MORI v2.7
+    tested socket, bind, and accept operations retained
+    complete application compatibility not established
+\end{lstlisting}
+
+Operational characteristics are compared in
+\cref{tab:vendor-operational-comparison}.
+
+\begin{table}[H]
+    \centering
+    \caption{Operational comparison of the temporary controls.}
+    \label{tab:vendor-operational-comparison}
+    \scriptsize
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+        \toprule
+        Dimension & Canonical \code{kmod} mitigation & MORI Guard v1 & MORI v2.7 \\
+        \midrule
+        Delivery &
+        Ubuntu package and vendor advisory. &
+        Local configuration plus root-owned blocker script. &
+        Local BPF build, privileged loader, service integration, and policy
+        state. \\
+
+        Initial activation &
+        Package update plus unload or reboot where required. &
+        Deploy rule and script, confirm module absence, then validate. &
+        Verify kernel facilities and monitor trust, load BPF object, attach
+        programs, and keep loader active. \\
+
+        Decision telemetry &
+        Generic module-load failure; no dedicated structured deny event is
+        defined by the captured rule. &
+        Journal event and optional presentation message. &
+        Trace event, structured ring-buffer record, and optional TTY message. \\
+
+        Maintenance &
+        Vendor tracks package lifecycle and superseding kernel update. &
+        Operator owns script, configuration, and local rollback. &
+        Operator owns source, build chain, hooks, maps, trust model, regressions,
+        and portability. \\
+
+        Failure tendency &
+        Conservative and broad: unavailable interface. &
+        Conservative and broad, with an additional local script dependency. &
+        Selective but potentially fail-open on state-allocation failure or
+        out-of-model behaviour. \\
+
+        Retirement &
+        Documented after installation of a fixed kernel. &
+        Remove local rule and blocker after patch validation. &
+        Detach programs, stop loader, remove service state, and repeat benign
+        and adversarial validation on the patched kernel. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+MORI's richer telemetry is useful for research and incident reconstruction. It
+can distinguish a matched behavioural policy from a generic module-loading
+failure and can preserve the identity associated with a denial. That advantage
+does not make it a stronger emergency mitigation by itself. A simpler control
+with less context may still be preferable when its broader denial boundary is
+acceptable and its deployment path is substantially easier to support.
+
+The same reasoning applies to vendor status. Packaging and vendor support do not
+prove that a control has no defects, but they materially change who maintains
+the response, how updates are distributed, and how an administrator determines
+when the workaround should be removed. MORI v2.7 has no equivalent portability,
+performance, or long-term maintenance programme.
+
+\subsection{Decision Analysis}
+
+The comparison produces three practical decisions rather than one unconditional
+winner.
+
+\subsubsection{Emergency containment before a patch}
+
+Where applications do not require the affected interface, or where temporary
+loss is acceptable, Canonical's packaged mitigation is the preferred emergency
+control. It removes the known module prerequisite through a standard Ubuntu
+update and has a documented activation and retirement process. MORI Guard v1
+does not improve that compatibility boundary and adds locally maintained code.
+
+\subsubsection{Temporary retention of tested interface operations}
+
+Where the vulnerable kernel must temporarily remain and the tested AF\_ALG AEAD
+operations cannot be removed, MORI v2.7 demonstrates a narrower experimental
+option. The decision should be conditioned on the actual workload matching the
+tested environment, acceptance of the identified bypass and false-positive
+boundaries, availability of the required kernel facilities, and active
+ownership of the control's maintenance.
+
+This is a research result, not a general deployment recommendation. A production
+operator would need additional application compatibility testing, sustained
+performance measurement, concurrency and lifecycle regression, fail-open and
+fail-closed analysis, independent code review, and a supported deployment and
+rollback process.
+
+\subsubsection{Long-term remediation}
+
+Neither form of temporary denial should remain the target state. The correct
+long-term action is installation of a fixed vendor kernel and removal of the
+workaround after reboot and validation. This restores ordinary interface
+availability while addressing the in-place AEAD behaviour in the kernel rather
+than predicting or preventing one exploitation sequence.
+
+\subsection{Answer to RQ5}
+
+RQ5 asks how the custom compensating control compares with Canonical's temporary
+module-loading mitigation. The answer depends on which MORI generation is being
+compared.
+
+MORI Guard v1 is functionally similar to Canonical's mitigation for the tested
+Ubuntu module configuration. Both prevent normal loading of
+\code{algif\_aead}, interrupt the known module-dependent exploitation path, and
+remove benign access to the same interface. MORI Guard v1 adds laboratory
+journalling and presentation, but it is locally maintained and provides no
+compatibility advantage. Canonical's packaged rule is therefore the stronger
+operational choice for broad temporary containment.
+
+MORI v2.7 offers a different trade-off. It preserved the tested AF\_ALG AEAD
+socket, bind, and accept operations and denied the correlated Python and
+independent C proof-of-concept paths in the pre-remediation Phase~04 sequence.
+It also supplied structured decision telemetry. Those advantages are balanced by a narrower
+behavioural coverage claim, more complex privileged deployment, kernel-feature
+dependencies, possible false positives for a benign matching sequence, and
+explicit evasion and fail-open boundaries.
+
+The supported conclusion is therefore:
+
+\begin{lstlisting}
+Canonical's kmod mitigation is the preferable vendor-supported
+emergency containment when broad module removal is acceptable.
+
+MORI v2.7 demonstrates that narrower prevention with greater
+tested interface availability is possible, but only as an
+experimental compensating control with bounded assurance.
+
+Neither custom control replaces the fixed vendor kernel.
+\end{lstlisting}
+
+The laboratory does not claim that MORI v2.7 is universally safer, more secure,
+or more compatible than Canonical's response. It demonstrates a defensible
+engineering alternative for the tested path and makes the cost of selectivity
+visible.
+
+\subsection{Transition to Patched-Kernel Validation}
+
+RQ5 ends at the temporary-control decision. RQ6 asks a different question:
+whether the reproduced behaviour disappears after installation of a corrected
+kernel and whether the final observations match the expected upstream change.
+Canonical identifies \code{6.8.0-117.117} as the first fixed Noble generic
+kernel; the Phase~05 guest ran the later \code{6.8.0-137.137} package
+\cite{ubuntu-copyfail-cve}.
+
+That transition must isolate the kernel correction from both custom and
+module-level denial. The patched retest therefore needs to show that MORI is not
+making the decision, that the Canonical loading rule is disabled for the test,
+that \code{algif\_aead} can load, and that the benign AF\_ALG control reaches
+the operations exercised by the laboratory. Only then can a failed proof of
+concept be attributed to the patched execution path rather than to continued
+interface removal.
+
+The Phase~05 package also contains three provenance imperfections that Chapter~9
+must preserve rather than silently repair:
+
+\begin{itemize}
+    \item The file named \code{phase05-pre-patch.txt} already records
+    \code{6.8.0-137-generic}. It is a patched pre-retest baseline, not evidence
+    of a pre-patch runtime.
+
+    \item The machine-readable C provenance capture contains permission errors
+    instead of the claimed source and binary hashes. The successful values are
+    preserved in screenshot~10 and must be attributed to that visual evidence.
+
+    \item The timestamped machine-readable MORI-isolation capture was produced
+    later than the timestamped C provenance capture. Screenshot~02 records the
+    isolation state but has no embedded terminal time, so strict pre-test causal
+    ordering is not established by timestamps alone.
+\end{itemize}
+
+These caveats do not change the RQ5 comparison, which rests on the Phase~01
+vendor-policy capture, the Phase~04 control experiments, and Canonical's
+published response. They do constrain the wording of the final patch-validation
+claim. Chapter~9 therefore treats the Phase~05 result as a bounded empirical
+retest, distinguishes successful screenshots from failed text captures, and
+separates observed state from inferred chronology.
