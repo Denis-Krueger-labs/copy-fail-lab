@@ -1,0 +1,648 @@
+\section{Patched-Kernel Validation}
+\label{sec:patched-kernel-validation}
+
+Chapter~8 established that both Canonical's temporary module-loading rule and
+the custom MORI controls are transitional measures. The stronger end state is
+not a more elaborate denial policy, but a corrected kernel that permits the
+affected interface to remain available without reproducing the page-cache
+manipulation observed on the vulnerable runtime. Phase~05 therefore removes the
+temporary controls from the intended decision path and returns to the original
+proof-of-concept question:
+
+\begin{quote}
+\textbf{RQ6 -- Patch Validation.} Does reproduction fail after installation of
+a corrected kernel, and do the observations from the final retest match the
+expected behaviour of the upstream fix?
+\end{quote}
+
+The final retest used Ubuntu kernel \code{6.8.0-137-generic}, supplied by
+package version \code{6.8.0-137.137}. Canonical identifies
+\code{6.8.0-117.117} as the first fixed Noble generic-kernel version, placing
+the tested package beyond the published correction boundary
+\cite{ubuntu-copyfail-cve}. The ordinary \code{algif\_aead} loading path was
+restored, the module was successfully loaded, and the tested benign AF\_ALG
+AEAD operations remained available.
+
+Against that state, the same Python sample hash that produced a UID~0 shell on
+\code{6.8.0-116-generic} instead reached the normal \code{/usr/bin/su}
+authentication boundary. An independently compiled C implementation produced
+the same patched-side outcome in two recorded executions. The mounted view of
+\code{/usr/bin/su} retained its known-good digest and the expected root-owned
+SUID metadata throughout the captured validation.
+
+These observations support a positive but bounded answer to RQ6. Reproduction
+failed for the two tested implementations, and the combination of retained
+interface availability with no captured privileged-file change is consistent
+with the upstream return to out-of-place AEAD processing. The evidence does not
+constitute a binary-level proof that a particular commit executed internally,
+nor is the Phase~05 sequence a perfectly matched controlled trial. This chapter
+therefore documents both the result and the provenance imperfections that limit
+its causal strength.
+
+\subsection{Validation Logic and Evidence Boundary}
+
+Patch validation requires more than observing that a proof of concept prints
+an error or fails to open a root shell. The same visible outcome could be
+produced by a disabled module, a still-active compensating control, an altered
+test sample, a different target state, or an unrelated execution failure. The
+Phase~05 design consequently uses a chain of controls rather than treating the
+proof-of-concept output as a self-sufficient result.
+
+The required observations are summarised in
+\cref{tab:patch-validation-criteria}.
+
+\begin{table}[H]
+    \centering
+    \caption{Success criteria for the patched-kernel validation.}
+    \label{tab:patch-validation-criteria}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        Criterion & Required observation & Evidential meaning \\
+        \midrule
+        Corrected runtime identified &
+        Running kernel and installed package are recorded at or beyond the
+        vendor's fixed-version boundary. &
+        Connects the retest to a vendor-remediated release rather than merely
+        to a newer-looking version string. \\
+
+        Alternative controls removed &
+        No active MORI enforcement path is observed, and normal module
+        resolution is restored. &
+        Reduces the risk of attributing a custom or module-level denial to the
+        kernel correction. \\
+
+        Interface retained &
+        \code{algif\_aead} can load and an unprivileged control reaches the
+        tested AF\_ALG AEAD operations. &
+        Distinguishes correction of the vulnerable behaviour from removal of
+        the complete interface. \\
+
+        Reproduction absent &
+        The proof of concept does not produce the previously observed UID~0
+        transition. &
+        Demonstrates regression for the tested execution path. \\
+
+        Target preserved &
+        The mounted target retains its known-good digest, ownership, size, and
+        SUID mode after the retests. &
+        Excludes the successful changed-view state documented in Chapter~5 at
+        the time of the post-test captures. \\
+
+        Implementation diversity &
+        A separately implemented and hashed C path is also exercised. &
+        Reduces dependence on behaviour unique to the Python wrapper, without
+        proving every exploit variant. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The frozen public package contains five text artifacts and thirteen
+screenshots. Its \code{PUBLIC-SHA256SUMS.txt} manifest covers all eighteen
+objects, and all entries re-verify against the preserved repository copy. The
+README remains outside that manifest so that documentation can change without
+being confused with captured experimental evidence. Conclusions in this
+chapter are therefore grounded in the manifested objects rather than in the
+README's descriptions alone.
+
+The evidence classes are not interchangeable. Machine-readable artifacts
+provide exact captured text and timestamps where present. Screenshots preserve
+interactive executions that were not also recorded as raw transcripts. The
+vendor record establishes the fixed package boundary. The upstream change
+describes the expected implementation-level correction. No single class proves
+the whole causal claim; the conclusion depends on their agreement.
+
+\subsubsection{Known imperfections carried forward}
+
+Four boundaries materially affect the evaluation:
+
+\begin{enumerate}
+    \item The Phase~05 baseline artifact carrying the \emph{pre-patch} label is
+    misnamed. Its own contents identify \code{6.8.0-137-generic}; it is a
+    patched pre-retest baseline, not a capture from before installation of the
+    fix.
+
+    \item The text artifact named
+    \code{phase05-independent-c-poc-provenance.txt} contains permission errors
+    where source and binary hashes were intended. The successful hash values
+    exist in screenshot~10 and are attributed only to that screenshot.
+
+    \item The machine-readable MORI-isolation record is timestamped after the
+    timestamp visible in the C provenance screenshot. Screenshot~02 shows the
+    required isolation state but contains no terminal timestamp. The filename
+    sequence and surrounding documentation support the intended order, but
+    timestamps alone do not establish strict pre-test causality.
+
+    \item The Python comparison changes the executing account. The vulnerable
+    run used \code{labuser} at UID~1001, while the patched screenshot records
+    \code{researcher} at UID~1000. The sample hash is matched, but the complete
+    execution context is not.
+\end{enumerate}
+
+These imperfections do not erase the observed patched-side result. They do
+prevent the chapter from claiming a laboratory-perfect single-variable trial.
+
+\subsection{Expected Behaviour of the Kernel Correction}
+
+The upstream correction is titled \emph{crypto: algif\_aead -- Revert to
+operating out-of-place}. It largely reverts the earlier in-place implementation
+while retaining explicit copying of the associated data. The commit explains
+that the source and destination originate from different mappings and changes
+the AEAD request so that the transmitted scatter-gather list is used as the
+cryptographic source while the receive scatter-gather list remains the
+destination \cite{linux-copyfail-fix}.
+
+For this laboratory, that change leads to three observable expectations:
+
+\begin{enumerate}
+    \item \textbf{The interface should remain present.} The correction changes
+    buffer handling; it is not the temporary policy that prevents
+    \code{algif\_aead} from loading.
+
+    \item \textbf{Benign operations should remain reachable.} An unprivileged
+    process should still be able to create, bind, and accept the tested AEAD
+    socket when the ordinary module path is available.
+
+    \item \textbf{The exploit's shared-page effect should disappear.} The
+    tested attempt should no longer provide the changed privileged-file view
+    that previously allowed the SUID execution path to produce UID~0.
+\end{enumerate}
+
+The third expectation is phrased at the observation level. Phase~05 did not
+instrument the internal scatter-gather lists or trace the precise source and
+destination pages used by the corrected request. Agreement between the
+published patch mechanism and the external result is therefore consistency
+evidence, not a direct runtime trace of the upstream code path.
+
+Canonical's Noble record supplies the distribution boundary needed for that
+comparison. Generic kernel \code{6.8.0-117.117} is listed as fixed, while the
+laboratory ran the later \code{6.8.0-137.137} package
+\cite{ubuntu-copyfail-cve}. Version ordering supports the presence of the
+correction in the vendor build; the project did not independently extract and
+compare the running kernel's machine code with upstream commit
+\code{a664bf3d603dc3bdcf9ae47cc21e0daec706d7a5}.
+
+\subsection{Patched Baseline and Control Isolation}
+
+The first Phase~05 capture records the following environment:
+
+\begin{lstlisting}
+Operating System: Ubuntu 24.04.2 LTS
+Kernel:           Linux 6.8.0-137-generic
+
+linux-image-6.8.0-137-generic          6.8.0-137.137
+linux-image-generic                    6.8.0-137.137
+
+/usr/bin/su:
+-rwsr-xr-x 1 root root 55680
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+\end{lstlisting}
+
+The older \code{6.8.0-116.116} packages remained installed, but
+\code{uname} identified \code{6.8.0-137-generic} as the running release. This
+distinction matters because installed packages do not establish which kernel
+is executing.
+
+The baseline also shows that both module-loading rules had been renamed with
+disabled suffixes:
+
+\begin{lstlisting}
+disable-algif_aead.conf.disabled
+mori-copyfail-guard.conf.disabled-v2-2-test
+\end{lstlisting}
+
+Screenshot~02 confirms the effective resolution rather than relying only on
+those filenames. A dry run selected the normal \code{af\_alg.ko.zst} and
+\code{algif\_aead.ko.zst} insertion paths. The same screenshot contains no MORI
+process and no MORI BPF pin, and reports the integrity service as inactive. A
+later machine-readable isolation record reports the service as both inactive
+and disabled.
+
+One distinction is necessary here. The earliest patched baseline still lists
+the legacy \code{mori\_integrity\_watch.py} process and an enabled integrity
+service. That component observes the protected target; it is not the MORI v2.7
+BPF enforcement path. Nevertheless, the intended experiment removed even that
+observer before the active retests so that its output could not be mistaken for
+the kernel's decision. The later captures document the resulting inactive
+state, subject to the timestamp limitation already stated.
+
+\begin{table}[H]
+    \centering
+    \caption{State used to reduce alternative explanations in Phase~05.}
+    \label{tab:phase05-isolation-state}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        State question & Captured observation & Interpretation \\
+        \midrule
+        Which kernel ran? &
+        \code{uname} and package capture identify
+        \code{6.8.0-137-generic} / \code{6.8.0-137.137}. &
+        Retest executed beyond Canonical's first fixed Noble version. \\
+
+        Was vendor module denial active? &
+        Rule stored under a disabled filename; dry run resolves to ordinary
+        module insertion. &
+        The temporary \code{/bin/false} policy was not the observed failure
+        mechanism. \\
+
+        Was MORI v2.7 active? &
+        No MORI process or BPF pin appears in the isolation screenshot or the
+        later text capture. &
+        No captured custom enforcement path explains the patched result. \\
+
+        Was \code{algif\_aead} available? &
+        Normal resolution was restored and the module later appears loaded. &
+        Result was not produced by wholesale interface removal. \\
+
+        Is ordering airtight? &
+        No; the untimestamped screenshot and later raw isolation capture do not
+        prove the entire order from timestamps alone. &
+        Causal attribution remains bounded rather than absolute. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Benign AF\_ALG Regression Control}
+
+Before evaluating proof-of-concept outcomes, Phase~05 tested whether an
+ordinary unprivileged caller could still reach the affected interface. The
+machine-readable control identifies \code{labuser} as UID~1001 and records:
+
+\begin{lstlisting}
+socket(AF_ALG):                  OK
+bind(("aead", "gcm(aes)")):     OK
+accept():                       OK
+
+algif_aead             12288  0
+af_alg                 32768  1 algif_aead
+\end{lstlisting}
+
+The target digest immediately following the control remained:
+
+\begin{lstlisting}
+c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b
+\end{lstlisting}
+
+This control closes an important alternative explanation. A failed exploit on
+a system where \code{algif\_aead} cannot load would reproduce the broad
+temporary-mitigation result from Chapter~8, not demonstrate corrected in-kernel
+behaviour. Here, the module was loaded and the three exercised operations were
+available to the same unprivileged account class used by the original
+reproduction.
+
+The control is still limited. It does not perform a complete encryption and
+decryption round trip, verify ciphertext or authentication-tag correctness,
+measure performance, or exercise concurrent application workloads. Its
+supported claim is \emph{tested interface availability}: socket creation, AEAD
+binding to \code{gcm(aes)}, and \code{accept()} succeeded. The README's broader
+phrase \emph{benign AEAD lifecycle} is interpreted only within those recorded
+operations.
+
+\subsection{Python Proof-of-Concept Differential Retest}
+
+The Python path provides the strongest direct before-and-after comparison
+because the sample digest is shared with the successful vulnerable-kernel run.
+
+\subsubsection{Sample identity and execution-context difference}
+
+Screenshot~07 records the patched-side source as a 731-byte Python file with
+SHA-256:
+
+\begin{lstlisting}
+d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61
+\end{lstlisting}
+
+Chapter~5 records the same digest for the Python proof of concept that produced
+a UID~0 shell on \code{6.8.0-116-generic}. Matching the sample removes source
+drift as an obvious explanation for the changed result.
+
+The user context was not matched. The successful vulnerable run was executed by
+\code{labuser}, UID~1001. The patched screenshot places the file under
+\code{/home/researcher} and records the post-test process as
+\code{researcher}, UID~1000. That account belongs to the local \code{sudo} and
+\code{lxd} groups. The record does not show a \code{sudo} invocation and the
+final identity remained UID~1000, but those supplementary memberships prevent
+treating the account as equivalent to the deliberately restricted
+\code{labuser} threat-model subject. This is a non-root result, not an
+identity-perfect replay of Chapter~5.
+
+\subsubsection{Observed result}
+
+On the vulnerable kernel, the matched Python sample previously produced:
+
+\begin{lstlisting}
+uid=0(root) gid=1001(labuser) groups=1001(labuser),100(users)
+root
+\end{lstlisting}
+
+On \code{6.8.0-137-generic}, the recorded execution instead reached:
+
+\begin{lstlisting}
+Password:
+su: Authentication failure
+
+uid=1000(researcher) gid=1000(researcher) ...
+\end{lstlisting}
+
+The authentication message is significant because the proof of concept
+continued far enough to execute \code{/usr/bin/su}; the expected unauthorised
+modification simply did not provide the prior bypass. It is not an explicit
+kernel security-policy denial, and the chapter does not label it as one. The
+patched observation is ordinary application behaviour after the attempted
+manipulation failed to create the previously effective target view.
+
+Screenshot~08 then records \code{/usr/bin/su} as a 55,680-byte root-owned file
+with mode \code{4755} and the known-good digest. No changed mounted view was
+captured after the Python attempt.
+
+\subsection{Independent C Implementation Retest}
+
+The second path was a separately compiled C implementation. It reduces the
+chance that the patched-side observation is merely a Python runtime or wrapper
+failure, but it does not provide a second matched vulnerable-versus-patched
+pair: the preserved project record does not show this C binary succeeding on
+the vulnerable kernel without MORI enforcement.
+
+\subsubsection{Provenance evidence}
+
+Screenshot~10 records the following source and binary identities:
+
+\begin{lstlisting}
+source  e1dec1348c0d43ab47d8f992d9a0336216fd37ff83e6fa1d9e39a80890fbd165
+binary  3b2605dc5e820f40645f682385194469f9189cbb65ee99153b52aedf45be5706
+
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+\end{lstlisting}
+
+The source and binary were owned by \code{labuser}. Screenshot~11 repeats the
+binary hash immediately before the recorded executions and again between them.
+This creates a useful visual provenance chain for the tested executable.
+
+The raw artifact with the corresponding provenance filename does not contain
+these values. Its \code{realpath}, \code{ls}, and \code{sha256sum} operations
+all failed with \code{Permission denied}; only the compiler version succeeded.
+The chapter therefore does not describe that text file as a successful hash
+capture. The hashes above are supported by screenshots~10 and~11.
+
+\subsubsection{Observed result}
+
+The C implementation identified the selected \code{/usr/bin/su} offset,
+reported ten attempted writes, and then executed the target. In both recorded
+runs, the result was:
+
+\begin{lstlisting}
+[+] Executing /usr/bin/su
+Password:
+su: Authentication failure
+\end{lstlisting}
+
+The prompt returned to \code{labuser} after each execution. The program's own
+line stating that it is ``Patching page cache'' describes its intended action;
+it is not accepted as evidence that the privileged file view actually changed.
+The independent evidence of effect is the target state and execution outcome,
+both of which remained inconsistent with successful exploitation.
+
+Screenshot~09 records the known-good target digest and metadata before the C
+test. Screenshot~12 and the final machine-readable artifact later record the
+same digest, root ownership, 55,680-byte size, and mode \code{4755}. A direct
+invocation of \code{/usr/bin/su} also reached normal authentication and rejected
+the unauthorised attempt.
+
+\subsection{Differential Evaluation Against the Vulnerable State}
+
+The most useful interpretation comes from comparing Phase~02 and Phase~05
+rather than considering the patched screenshots in isolation. The differential
+is summarised in \cref{tab:vulnerable-patched-differential}.
+
+\begin{table}[H]
+    \centering
+    \caption{Observed vulnerable and patched states.}
+    \label{tab:vulnerable-patched-differential}
+    \scriptsize
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}Y@{}}
+        \toprule
+        Dimension & Vulnerable Phase~02 & Patched Phase~05 \\
+        \midrule
+        Running kernel &
+        \code{6.8.0-116-generic}, package \code{6.8.0-116.116}. &
+        \code{6.8.0-137-generic}, package \code{6.8.0-137.137}. \\
+
+        Python sample &
+        SHA-256 \code{d401e7d1...19a61}. &
+        Same SHA-256 \code{d401e7d1...19a61}. \\
+
+        Executing identity &
+        \code{labuser}, UID~1001. &
+        \code{researcher}, UID~1000; administrative supplementary groups; no
+        \code{sudo} invocation captured. \\
+
+        Module path &
+        Normal \code{algif\_aead} insertion available and module loaded. &
+        Vendor and MORI rules disabled; normal insertion restored; module
+        loaded. \\
+
+        Python outcome &
+        UID~0 shell and username \code{root}. &
+        Normal \code{su} authentication failure; identity remained UID~1000. \\
+
+        Mounted target view &
+        Digest changed to \code{44900c63...79be9} after exploitation. &
+        Known-good digest \code{c74311fe...dae78b} retained in post-test
+        captures. \\
+
+        Backing-filesystem comparison &
+        Direct ext4 read retained the known-good digest while the mounted view
+        differed. &
+        No equivalent direct backing-filesystem read was captured in Phase~05. \\
+
+        Independent C path &
+        No preserved unmitigated success trial for this binary. &
+        Two executions reached normal authentication; final target state
+        remained intact. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The paired Python result is the central regression evidence: the sample hash,
+target path, operating-system family, module-dependent interface, and broad
+execution objective remain the same, while the running kernel crosses the
+vendor fix boundary and the privilege transition disappears. The different
+account and incomplete timestamp chain mean the kernel version is not the only
+changed recorded variable. The C result and benign control add converging
+evidence, but they do not turn the sequence into a formally isolated causal
+experiment.
+
+The stable final target also needs careful interpretation. It demonstrates
+that the altered mounted view found during the vulnerable experiment was not
+present when the post-test hashes were captured. It does not exclude an
+extremely short-lived intermediate change between measurements, because
+Phase~05 did not continuously hash the file or trace every page-cache state.
+The immediate normal \code{su} behaviour makes such an unobserved transient
+insufficient for the tested privilege transition, but not logically impossible.
+
+\subsection{Alignment with the Expected Upstream Behaviour}
+
+RQ6 asks not only whether exploitation failed, but whether the result resembles
+the expected consequence of the upstream change. The comparison is shown in
+\cref{tab:upstream-observation-alignment}.
+
+\begin{table}[H]
+    \centering
+    \caption{Alignment between patch expectations and laboratory observations.}
+    \label{tab:upstream-observation-alignment}
+    \scriptsize
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}Y@{}}
+        \toprule
+        Patch-level expectation & Laboratory observation & Strength of match \\
+        \midrule
+        AEAD source and destination handled out-of-place &
+        The exploit no longer produced the effective changed target view used
+        for UID~0. &
+        Mechanistically consistent, but internal buffers were not traced. \\
+
+        Associated data still copied and interface retained &
+        \code{algif\_aead} loaded; socket, bind, and accept controls succeeded. &
+        Direct support for tested interface availability, not complete crypto
+        correctness. \\
+
+        Kernel fix replaces need for module denial &
+        Ordinary module resolution was restored while both PoC paths failed to
+        produce elevated access. &
+        Strong within the tested configuration, subject to MORI chronology
+        caveat. \\
+
+        Privileged target should remain unmodified by the exploit path &
+        Mounted-view hash, ownership, size, and SUID mode matched the baseline
+        after both retests. &
+        Direct post-test evidence; no continuous or backing-device capture. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The observed pattern is more informative than a generic program failure. If
+the temporary mitigation had remained active, AF\_ALG AEAD would have been
+unavailable. If MORI v2.7 had made the decision, the expected result would have
+been an explicit policy denial and associated MORI telemetry. Instead, the
+tested interface remained reachable and the attempted exploit progressed to
+ordinary \code{su} authentication without producing the prior target effect.
+That pattern matches the external consequence expected from repairing the
+in-place AEAD handling.
+
+The wording remains \emph{matches the expected behaviour}, not \emph{proves the
+upstream commit}. The installed package version, Canonical's fixed-status
+record, and the matching external behaviour jointly support attribution to the
+vendor kernel. Exact commit provenance inside the Ubuntu build and direct
+runtime observation of the corrected scatter-gather path were not independently
+captured.
+
+\subsection{Limitations and Alternative Explanations}
+
+The final claim is constrained by the following limitations:
+
+\begin{itemize}
+    \item \textbf{No single-variable snapshot pair.} The patched test followed
+    several earlier experimental phases and was not produced by changing only
+    the kernel inside one continuously recorded session.
+
+    \item \textbf{Different Python user.} The same Python sample hash was used,
+    but the vulnerable and patched runs used UID~1001 and UID~1000
+    respectively.
+
+    \item \textbf{Isolation chronology.} The state showing no MORI process or
+    BPF pins is preserved, but its strict ordering relative to every test is not
+    established by embedded timestamps alone.
+
+    \item \textbf{Interactive-only execution evidence.} The successful Python
+    and C patched retests are recorded in screenshots rather than complete raw
+    terminal transcripts. No transcript was reconstructed retrospectively.
+
+    \item \textbf{Failed machine-readable C provenance.} The text artifact
+    contains permission errors; successful source and binary hashes are visual
+    evidence from screenshot~10.
+
+    \item \textbf{Limited benign control.} Socket creation, bind, and accept
+    were tested. Encryption, decryption, authentication-tag verification,
+    concurrency, and application-level compatibility were not.
+
+    \item \textbf{No patched backing-device comparison.} Phase~05 did not
+    repeat the direct ext4 read used in Chapter~5, so the differential relies on
+    the mounted target state and execution outcome.
+
+    \item \textbf{No universal exploit coverage.} Two implementations were
+    exercised. The result does not prove that every variant, target, kernel
+    flavour, or container-escape scenario is fixed in every deployment.
+
+    \item \textbf{Version-based commit attribution.} The project relies on
+    Canonical's version status and observed behaviour rather than an independent
+    binary audit of the Ubuntu kernel package.
+\end{itemize}
+
+Several of these could be improved by a future evidence supplement: rename or
+supersede the mislabelled baseline without deleting the original, repeat both
+PoCs as the same dedicated unprivileged identity, capture timestamped isolation
+immediately before each execution, record raw transcripts, repeat the backing
+filesystem comparison, and perform a real AEAD encrypt/decrypt regression. Such
+work would strengthen provenance and compatibility claims; it is not required
+to rewrite the outcome already observed.
+
+\subsection{Answer to RQ6}
+
+RQ6 asks whether reproduction fails on a corrected kernel and whether the
+observations match the upstream fix. For the tested environment and the two
+preserved implementations, the answer is yes.
+
+The same Python proof-of-concept hash that produced a UID~0 shell on Ubuntu
+kernel \code{6.8.0-116-generic} did not reproduce that transition on
+\code{6.8.0-137-generic}. It reached ordinary \code{/usr/bin/su}
+authentication and the executing identity remained UID~1000. The independent C
+binary likewise reached normal authentication in two recorded executions and
+returned to the \code{labuser} prompt. After the retests, the mounted target
+retained its known-good digest, root ownership, SUID mode, and normal
+authentication behaviour.
+
+The failure cannot be explained by simple removal of the tested interface:
+\code{algif\_aead} loaded normally and the unprivileged socket, bind, and accept
+control succeeded. No active MORI enforcement path appears in the isolation
+state. The combination of retained interface availability and absent
+privileged-file effect is consistent with the upstream correction's return to
+out-of-place AEAD processing.
+
+The supported conclusion is therefore:
+
+\begin{lstlisting}
+On Ubuntu 24.04.2 LTS with kernel 6.8.0-137.137, the tested
+Python and independent C Copy Fail paths did not reproduce the
+previous unauthorised privilege transition.
+
+The tested AF_ALG AEAD interface operations remained available,
+and /usr/bin/su retained its known-good captured state.
+
+This outcome matches the expected external behaviour of the
+upstream out-of-place correction, within the stated provenance
+and experimental limitations.
+\end{lstlisting}
+
+This result closes the experimental arc: the vulnerable kernel reproduced the
+effect, detection observed its consequence, temporary controls interrupted the
+known path with different compatibility costs, and the corrected kernel removed
+the reproduced behaviour without requiring continued module denial. The fixed
+vendor kernel is therefore the appropriate final remediation for the tested
+system.
+
+\subsection{Transition to Final Synthesis}
+
+The six research questions have now been answered individually. Chapter~10
+draws them together rather than introducing another exploit experiment. It
+separates what the laboratory demonstrated from what remains inferred,
+evaluates the strengths and weaknesses of the evidence workflow, extracts the
+defensive lessons from MORI's iterations, and identifies the work required
+before any custom control could be considered outside a research setting.
+
+The final synthesis must preserve the asymmetry visible throughout the report:
+reproduction is specific, detection is behavioural but not uniquely
+attributive, selective prevention is possible only within a bounded model, and
+vendor remediation carries the strongest operational conclusion. Treating
+those statements as equally broad would erase the most important lesson of the
+project---assurance depends not only on whether a test passed, but on exactly
+what the evidence was capable of testing.
