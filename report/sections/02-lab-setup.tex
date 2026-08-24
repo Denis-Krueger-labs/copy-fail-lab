@@ -1,4 +1,8 @@
 \section{Laboratory Setup and Methodology}
+\label{sec:lab-setup}
+
+% Support compilation either from report/ or from the repository root.
+\graphicspath{{../evidence/}{evidence/}}
 
 \subsection{Laboratory Purpose and Scope}
 
@@ -10,16 +14,15 @@ historically vulnerable state to be reconstructed deliberately, and support
 later detection, mitigation, and patch-validation experiments under comparable
 conditions.
 
-Four methodological principles guided the design. First, all
-vulnerability-specific activity was confined to an isolated, privately owned
-virtual network. Second, the patched reference system and the vulnerable
-reproduction target were maintained as separate virtual machines rather than
-as successive states of a single machine. Third, reproduction was performed
-from a dedicated local account without administrative privileges, ensuring
-that successful access to UID~0 could be attributed to the tested
-privilege-escalation path. Finally, each experimental phase was treated as a
-separate checkpoint with its own command output, screenshots, configuration
-artifacts, and integrity manifests.
+The design followed four rules. First, all vulnerability-specific activity was
+confined to an isolated, privately owned virtual network. Second, the patched
+reference system and the vulnerable reproduction target were maintained as
+separate virtual machines rather than as successive states of one machine.
+Third, reproduction began from a dedicated local account without administrative
+privileges, so a later UID~0 result could be compared with a documented
+unprivileged starting state. Finally, each experimental phase was treated as a
+separate checkpoint and preserved with the applicable combination of command
+output, screenshots, configuration artifacts, and integrity manifests.
 
 This design separates the system state used for comparison from the state
 being modified during experimentation. It also allows observations from later
@@ -161,6 +164,15 @@ created as a full clone. The clone retained the same operating-system lineage
 and virtual-hardware profile, but its machine identity and SSH host keys were
 regenerated so that the guests no longer shared host identity.
 
+The guest baseline for VM~270 is preserved under
+\path{evidence/00-baseline/}. The sanitized hypervisor supplement
+\path{evidence-audit/vm270-proxmox-state-public.txt} records its virtual CPU,
+memory, disk, \code{vmbr1} attachment, and snapshot ancestry without publishing
+the original machine identifiers. The public package does not contain an
+equivalent Proxmox configuration transcript for VM~271, so the clone procedure
+is reported as laboratory methodology while later phase captures establish the
+runtime state actually used for each experiment.
+
 The virtual machines were assigned different roles before reconstruction.
 VM~270 was preserved as the known-good comparison system and was not downgraded
 or repeatedly reconfigured for exploit testing. VM~271 was the only guest
@@ -212,10 +224,14 @@ Its recorded supplementary membership was limited to the ordinary
 \code{users} group (GID~100); it was not assigned membership in administrative
 groups such as \code{sudo} or \code{lxd}. The threat model therefore assumed
 that an attacker had already obtained command execution as this ordinary
-account; the preceding compromise was not reproduced. Both tested Copy Fail
-implementations were launched from this account's shell, so the experiment
-began on the unprivileged side of the local privilege boundary.
-\Cref{tab:account-roles} summarizes the resulting separation of duties.
+account; the preceding compromise was not reproduced. The vulnerable-kernel
+reproduction and MORI enforcement trials used this account as their attacker
+context. The patched-kernel phase recorded the identity again for each retest
+rather than assuming it was unchanged: notably, its Python retest used the
+\code{researcher} account. That run can show that no automatic UID~0 transition
+was observed in its recorded context, but it is not an identity-matched repeat
+of the vulnerable \code{labuser} execution. \Cref{tab:account-roles} summarizes
+the resulting separation of duties.
 
 \begin{table}[H]
     \centering
@@ -234,19 +250,42 @@ began on the unprivileged side of the local privilege boundary.
         \code{labuser} (UID 1001; GID 1001) &
         Unprivileged local user; supplementary membership limited to
         \code{users} (GID 100) &
-        Attacker-controlled foothold and direct execution of the Python and C
-        proof-of-concept implementations \\
+        Primary attacker context for vulnerable-kernel reproduction and
+        compensating-control tests \\
         \bottomrule
     \end{tabularx}
 \end{table}
+
+The \code{researcher} state is recorded under
+\path{evidence/00-baseline/} in \path{command-output/id.txt}. The
+\code{labuser} state is recorded under \path{evidence/02-reproduction/} in
+\path{artifacts/01-pre-exploit-state.txt}. Later retests preserve their own
+identity captures where the execution context differs.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.36\textheight,
+        keepaspectratio
+    ]{02-reproduction/screenshots/01-pre-exploit-state.png}
+    \caption{Recorded vulnerable-kernel starting state: kernel
+    \code{6.8.0-116-generic}, \code{labuser} as UID~1001, its non-administrative
+    group membership, and the baseline digest of \code{/usr/bin/su}.}
+    \label{fig:labuser-pre-exploit-state}
+\end{figure}
+
+The screenshot in \cref{fig:labuser-pre-exploit-state} is the visual capture
+paired with the machine-readable pre-exploit artifact. Together they establish
+the starting privilege boundary used for the vulnerable-kernel reproduction.
 
 Before each relevant trial, the active identity and privilege state were
 recorded from the test account. Keeping preparation and execution contexts
 separate prevents an inherited administrative session, a \code{sudo}-launched
 process, or a pre-existing root shell from being mistaken for successful local
 privilege escalation. Any later change in effective privilege could therefore
-be evaluated against the documented UID~1001 starting state and attributed to
-the tested execution path rather than to laboratory setup.      
+be evaluated against the identity recorded for that trial rather than being
+confused with laboratory setup.
 
 \subsection{Threat Model and Security Objectives}
 
@@ -301,9 +340,8 @@ compensating control from correction of the underlying kernel flaw.
         processes and remaining robust against attacker-controlled timing. \\
 
         Compatibility &
-        Preserve unrelated legitimate uses of the affected interfaces where
-        technically possible, allowing the cost of a selective control to be
-        compared with disabling the affected subsystem. \\
+        Preserve the specific benign interface operations selected for control
+        testing and state clearly which wider functionality was not exercised. \\
 
         Patch independence &
         Verify that a corrected kernel prevents the tested escalation path
@@ -319,7 +357,9 @@ compensating control is expected to act on the correlated exploitation path
 rather than on one known proof-of-concept artifact. Compatibility is evaluated
 separately so that removing the vulnerable interface and selectively
 restricting its dangerous use are not treated as equivalent defensive
-properties.
+properties. In this report, compatibility means only the operations exercised
+by the documented controls; it is not a claim about every \code{AF\_ALG} or AEAD
+workload.
 
 The model excludes the means by which \code{labuser} was initially compromised,
 remote exploitation, persistence, credential collection, reverse shells,
@@ -341,75 +381,76 @@ system and made the state-changing work on VM~271 explicit.
 Each phase followed the same control cycle. A relevant snapshot or documented
 checkpoint was first established or restored. The running kernel, required
 interfaces, active account, defensive-control state, and protected target were
-then verified as applicable to that phase. Pre-test evidence was captured before
-the phase-specific activity was performed. Event output, privilege state, and
-target state were recorded immediately afterwards, and the resulting artifacts
-were preserved before another kernel, configuration, or control change was
-introduced. \Cref{tab:experimental-sequence} maps this procedure onto the
-complete experimental sequence.
+then checked as applicable to that phase. Evidence was collected around the
+phase-specific activity, with pre-test and post-test captures used where they
+were available and relevant. The resulting artifacts were preserved before
+another kernel, configuration, or control change was introduced.
+\Cref{tab:experimental-sequence} maps this procedure to the six public evidence
+sets used by the report.
 
 \begin{table}[H]
     \centering
     \caption{Controlled experimental sequence and state transitions.}
     \label{tab:experimental-sequence}
     \small
-    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.20\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}Y@{}}
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.29\textwidth}Y@{}}
         \toprule
-        Phase & Established state & Methodological purpose \\
+        Evidence set & Established state & Methodological purpose \\
         \midrule
-        Reference baseline &
+        Phase 00 &
         VM~270 preserved as the patched reference &
         Record a known-good comparison state that was not subjected to
         vulnerable reconstruction or exploit development. \\
 
-        Vulnerable reconstruction &
+        Phase 01 &
+        VM~270 checked against the Copy Fail prerequisites and vendor state &
+        Record which relevant interfaces, modules, package rules, and fixed
+        kernel state were present before building the vulnerable target. \\
+
+        Phase 02 &
         VM~271 booted into the selected historical kernel with the required
-        Copy Fail interfaces available &
-        Establish and verify the preconditions for reproduction without
-        altering the reference system. \\
+        Copy Fail interfaces available and no specific enforcement active &
+        Verify the vulnerable preconditions, execute from the documented
+        UID~1001 context, and record the privilege and target states. \\
 
-        Unmitigated reproduction &
-        Vulnerable VM~271 with no Copy Fail-specific enforcement active &
-        Execute the proof of concept from the documented UID~1001 context and
-        capture the pre-test and post-test privilege and target states. \\
-
-        Observation and detection &
+        Phase 03 &
         Reproducible vulnerable state with monitoring introduced separately
         from enforcement &
         Identify observable behaviour, evaluate integrity-based monitoring,
         and compare behavioural evidence with artifact-specific detection. \\
 
-        Broad mitigation comparison &
-        Vulnerable kernel with interface-level restriction applied and then
-        removed under controlled conditions &
-        Test the preventive effect and compatibility cost of removing access to
-        the affected interface before developing a selective control. \\
+        Phase 04 &
+        Vulnerable kernel with broad restriction followed by successive MORI
+        observation, correlation, shadow, and enforcement candidates &
+        Compare interface removal with selective control, exercise positive and
+        negative regression cases, and freeze the final vulnerable-kernel
+        candidate. \\
 
-        Selective MORI development &
-        Vulnerable kernel with successive observation, correlation, shadow,
-        and enforcement candidates &
-        Exercise positive, negative, cross-context, timing, alternate-target,
-        and implementation-independent regression cases before freezing the
-        candidate used for final vulnerable-kernel testing. \\
-
-        Vendor-patch validation &
+        Phase 05 &
         VM~271 updated to the corrected kernel with MORI isolated from the
         active enforcement path &
-        Repeat the interface control and both proof-of-concept paths so the
-        patched-kernel behaviour can be evaluated independently of the custom
-        compensating control. \\
+        Record the identity used for each retest, exercise the tested interface
+        operations, and repeat both proof-of-concept paths independently of the
+        custom control. \\
         \bottomrule
     \end{tabularx}
 \end{table}
+
+The phase numbers correspond directly to the directories under
+\path{evidence/}. Phase~04 contains several internal MORI checkpoints because
+control development required more than one state transition, but those
+checkpoints are engineering iterations rather than independent experimental
+samples.
 
 The order of these transitions was significant. Unmitigated reproduction was
 completed before preventive mechanisms were introduced, ensuring that later
 denials could be compared with a demonstrated vulnerable path. Monitoring was
 introduced before selective enforcement so that candidate observables and
 correlation rules could be examined without initially changing the tested
-operation. Broad interface restriction provided a compatibility reference,
-whereas the later MORI stages progressively narrowed the controlled behaviour
-through observation, correlation, shadow evaluation, and active enforcement.
+operation. Broad interface restriction showed the effect on the interface
+operations selected for testing, whereas the later MORI stages progressively
+narrowed the controlled behaviour through observation, correlation, shadow
+evaluation, and active enforcement.
 
 Regression testing was treated as part of control development rather than as a
 single final exploit run. Trials varied the proof-of-concept implementation,
@@ -422,12 +463,14 @@ documented build and system state.
 
 Vendor remediation was applied only after the vulnerable-kernel experiments
 and their checkpoints had been preserved. Isolation of MORI from the active
-enforcement path was defined as a precondition of the patched-kernel retest and
-was recorded separately from the proof-of-concept output. This prevents a
-denial caused by the compensating control from being attributed to the vendor
-patch. The affected interface was checked separately so that failure of the
-exploitation path would not be confused with wholesale removal of the tested
-functionality.
+enforcement path was a required condition of the patched-kernel retest. The
+evidence for its exact timing is not perfect: a screenshot shows the isolated
+state in the retest sequence, while the timestamped machine-readable capture
+was collected later. The patched result is therefore interpreted from the
+combined state and execution records rather than from that timestamp alone.
+The affected interface was checked separately at the \code{socket()},
+\code{bind()}, and \code{accept()} stages. This confirms availability of those
+tested operations, not a complete encrypt/decrypt round trip.
 
 The phases form a dependent engineering and validation sequence rather than a
 set of independent statistical samples. Their evidential value therefore rests
@@ -439,16 +482,15 @@ in which it was actually exercised.
 
 \subsection{Evidence Collection, Integrity, and Publication Workflow}
 
-Evidence collection was performed alongside the experimental phases and kept
-separate from the analytical report. Each phase directory was organised around
-the system state and question being tested, normally combining machine-readable
-artifacts, screenshots, explanatory documentation, and an integrity manifest.
-This structure allowed later claims to be traced to the relevant precondition,
-execution, and post-test records without treating the report narrative itself
-as primary evidence.
+Evidence was collected alongside each experimental phase and kept separate
+from the analytical report. Phase directories normally combined
+machine-readable artifacts, screenshots, explanatory documentation, and an
+integrity manifest. This structure allowed later claims to be traced to their
+preconditions, execution, and post-test records without treating the report
+narrative as primary evidence.
 
 The evidence classes in \cref{tab:evidence-classes} served complementary
-purposes. No single class was treated as sufficient for every claim.
+purposes; no single class was considered sufficient for every claim.
 
 \begin{table}[H]
     \centering
@@ -457,109 +499,116 @@ purposes. No single class was treated as sufficient for every claim.
     \small
     \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}Y@{}}
         \toprule
-        Evidence class & Primary function & Limitation addressed by complementary evidence \\
+        Evidence class & Primary function & Inherent limitation \\
         \midrule
         Command output and logs &
-        Preserve exact kernel, account, service, event, permission, and target
-        state in searchable form. &
-        The capture reflects only the commands that were selected and may be
-        incomplete if permissions or collection failed. \\
+        Preserve searchable kernel, identity, service, event, permission, and
+        target state. &
+        Only the requested commands are represented; collection can fail or
+        omit context. \\
 
         Screenshots &
-        Preserve visible terminal context, command ordering, simultaneous
-        telemetry, and interactive outcomes. &
-        A screenshot is selective, may lack an embedded timestamp, and does not
-        provide the complete machine-readable output. \\
+        Preserve visible terminal context, ordering, concurrent telemetry, and
+        interactive outcomes. &
+        Captures are selective and may omit timestamps or complete output. \\
 
         Configuration and source &
-        Record the detector, mitigation, service, policy, and test material
-        relevant to a phase. &
-        Source alone does not establish which build was loaded or exercised. \\
+        Record relevant detectors, mitigations, services, policies, and test
+        material. &
+        Source does not establish which build was loaded or exercised. \\
 
         Build and provenance records &
-        Associate source, generated objects, executable builds, compiler
-        context, repository revisions, and cryptographic digests. &
-        Provenance links artifacts to a tested candidate but does not by itself
-        demonstrate the candidate's runtime behaviour. \\
+        Associate source, generated objects, binaries, compiler context,
+        revisions, and digests. &
+        Provenance identifies a candidate but does not prove its runtime
+        behaviour. \\
 
         Snapshots and checkpoints &
-        Preserve recoverable system states and historical MORI implementations
-        before later changes are introduced. &
-        A snapshot name or checkpoint establishes recoverability, not the truth
-        of an experimental claim without adjacent captures. \\
+        Preserve recoverable system states and historical MORI implementations. &
+        A checkpoint establishes recoverability, not an experimental claim
+        without adjacent captures. \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
 For state-changing trials, evidence was collected around the test rather than
-only after it. Applicable pre-test captures identified the running kernel,
-active account, relevant interface or module state, defensive-control state,
-and security-relevant properties of the privileged target. Execution output
-and telemetry were then recorded together with the resulting privilege and
+only afterwards. Applicable pre-test captures identified the kernel, account,
+interface or module state, defensive-control state, and privileged target.
+Execution output and telemetry were followed by the resulting privilege and
 target state. Where chronology was material, timestamps were included inside
-the capture when practicable. File-system and archive modification times were
-treated as supporting metadata rather than as the sole proof of event order.
+the capture when practicable; file-system and archive modification times were
+supporting metadata rather than the sole proof of event order.
 
-Evidence numbering and phase-specific maps preserved the recorded sequence.
-Missing or removed items were not hidden by renumbering later objects. A
-supplemental capture could clarify a retained state or artifact, but it could
-not retroactively establish a precondition that had not been captured at the
-relevant time. It therefore required explicit labelling rather than being
-presented as part of the original sequence.
+Evidence numbering and phase maps preserved the recorded sequence. Missing or
+removed items were not hidden by renumbering later objects. A supplemental
+capture could clarify a retained state or artifact, but could not retroactively
+establish an uncaptured precondition. It therefore required explicit labelling
+rather than being presented as part of the original sequence. Filenames were
+treated as navigation aids, not as proof of system state. If a filename and its
+captured contents disagreed, the commands and output inside the capture governed
+the interpretation.
 
-Implementation provenance was recorded separately from runtime results. MORI
-checkpoint directories preserved successive source, generated BPF objects,
-skeletons, and userspace builds; the validated candidate was placed under the
-distinct \code{current/} path. Cryptographic digests and provenance records
-associated the frozen source and build artifacts with the candidate used for
-final regression. Proof-of-concept provenance used available repository
-revisions, source and binary hashes, compiler information, and execution
-captures without requiring redistribution of the exploit implementation.
+Implementation provenance remained separate from runtime results. MORI
+checkpoints preserved successive source, generated BPF objects, skeletons, and
+userspace builds, while the validated candidate was placed under the distinct
+\code{current/} path. Digests and provenance records associated the frozen
+source and build artifacts with the candidate used for final regression.
+Proof-of-concept provenance used available repository revisions, source and
+binary hashes, compiler information, and execution captures without requiring
+redistribution of the exploit implementation.
 
-Integrity protection followed a two-stage workflow. Raw evidence was collected
-and hashed before the private original was preserved. Publication work was then
-performed on a separate copy. After redaction, omission, renaming, or other
-sanitization, the public package received its own SHA-256 manifest and was
-verified again after assembly or transfer. Public and private digests were not
-treated as interchangeable because a legitimate publication transformation
-necessarily changes the affected bytes.
+Integrity protection followed a two-stage workflow. Raw evidence was hashed
+before the private original was preserved. Publication work then occurred on a
+separate copy. After redaction, omission, renaming, or other sanitization, the
+public package received its own SHA-256 manifest and was verified again after
+assembly or transfer. Private and public digests were not interchangeable
+because legitimate publication transformations change the affected bytes.
 
-Manifest scope was defined per evidence package. The manifest itself was
-excluded from its own coverage, and editable documentation could be included or
-explicitly excluded depending on the phase. Consequently, the presence of a
-file beside \code{PUBLIC-SHA256SUMS.txt} did not automatically mean that the
-file was covered; verification used the manifest's enumerated paths. Whenever a
-filename or packaged object changed, the affected public manifest had to be
-regenerated and reverified before the package could be frozen.
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.46\textheight,
+        keepaspectratio
+    ]{01-vulnerability-validation/screenshots/01-validation-integrity-check.png}
+    \caption{Phase~01 command-output files verified against their recorded
+    SHA-256 list. This capture illustrates the integrity check used around the
+    experimental evidence packages.}
+    \label{fig:phase01-evidence-integrity-check}
+\end{figure}
 
-SHA-256 verification was used as a change-detection mechanism, not as proof
-that a capture was complete or correctly interpreted. A matching digest shows
-that the checked bytes correspond to the version listed by the manifest. It
-does not establish when the command ran, whether the selected command captured
-the intended property, whether a screenshot omitted relevant context, or
-whether a README describes the artifact accurately. Content review and
-cryptographic verification were therefore treated as separate publication
-gates.
+Manifest scope was defined per package. The manifest was excluded from its own
+coverage, while editable documentation could be included or explicitly
+excluded according to the phase. A file beside
+\code{PUBLIC-SHA256SUMS.txt} was therefore not automatically covered;
+verification used the manifest's enumerated paths. A filename or object change
+after manifest generation invalidated that entry until the manifest was updated.
+Verification results were therefore recorded entry by entry rather than
+summarized from the mere presence of a manifest.
 
-The public evidence copy was reviewed for credentials, tokens, internal network
-details, machine identifiers, and unrelated environmental information. Exploit
-source or other material unnecessary for verification could be withheld while
-retaining hashes, provenance, system state, and execution outcomes. Omissions
-were documented explicitly, and numbering gaps were preserved where useful to
-show that an item had been removed. The unsanitized source record remained
-separate so that publication edits did not overwrite the original capture.
+SHA-256 verification was a change-detection mechanism, not proof that a capture
+was complete or correctly interpreted. A matching digest shows that the checked
+bytes correspond to the listed version. It does not establish when a command
+ran, whether it captured the intended property, whether a screenshot omitted
+context, or whether documentation describes the artifact accurately. Content
+review and cryptographic verification were separate publication gates.
 
-Incomplete captures were retained and described according to what they actually
-contained. A permission error, truncated transcript, or screenshot-only
-execution was not relabelled as a successful machine-readable capture. Where a
-contemporaneous screenshot supplied information missing from a text artifact,
-the two could be cited together, but the screenshot did not alter the contents
-or status of the failed capture. No retrospective execution transcript was
-manufactured to make the evidence package appear more complete.
+The public copy was reviewed for credentials, tokens, internal network details,
+machine identifiers, and unrelated environmental information. Exploit source
+or other unnecessary material could be withheld while retaining hashes,
+provenance, system state, and execution outcomes. Omissions were documented,
+numbering gaps were preserved where useful, and publication edits did not
+overwrite the unsanitized original.
 
-This workflow provides traceability and detects changes within the project
-evidence set, but it is not equivalent to a formal forensic acquisition with an
-independent trusted timestamp, hardware-backed attestation, or an external
-witness. Claims in later chapters are therefore limited to the properties
-actually preserved by the cited artifacts and to the controlled laboratory
-states in which those artifacts were collected.
+Incomplete captures were retained and described according to their contents. A
+failed text capture stayed failed even when a contemporaneous screenshot
+preserved the missing result. The screenshot could supplement the record, but
+it did not rewrite the status of the original artifact. Screenshot-only runs
+also remained screenshot-only; no replacement transcript was created after the
+fact.
+
+This workflow supports internal traceability and change detection, but is not a
+formal forensic acquisition with an independent trusted timestamp,
+hardware-backed attestation, or external witness. Later claims are therefore
+limited to the properties preserved by the cited artifacts and to the
+controlled laboratory states in which they were collected.

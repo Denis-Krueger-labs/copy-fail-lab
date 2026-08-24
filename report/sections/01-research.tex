@@ -1,4 +1,5 @@
 \section{Introduction and Vulnerability Overview}
+\label{sec:introduction}
 
 \subsection{Vulnerability Overview}
 
@@ -36,6 +37,12 @@ published exploit can produce a root shell. The more useful question is what
 actually happens on the system while the vulnerability is being exploited,
 which parts of that behaviour can be observed, and whether the exploitation
 path can be detected or restricted before the vendor patch is applied.
+
+The mechanism described in this chapter comes from the published Copy Fail
+analysis and the upstream kernel fix. The later experiment asks a narrower
+question: do the states and effects observed in the laboratory match that
+explanation? The recorded results can answer that question without being
+treated as an instruction-by-instruction trace of the complete kernel path.
 
 \subsection{Technical Background and Vulnerability Mechanism}
 
@@ -87,10 +94,10 @@ can instead reach one of the chained page-cache pages
 The attacker can control both the position of this write and the four-byte
 value being written. Even though the subsequent authentication check fails,
 the modification is not rolled back. The affected page is also not marked
-dirty for normal filesystem writeback, meaning the file on disk remains
-unchanged while its cached in-memory representation has been modified. The
-result is therefore a deterministic four-byte write into the page cache of a
-file that the attacker only needs permission to read
+dirty for normal filesystem writeback. Under the published mechanism, the
+cached representation changes without a conventional persistent write to the
+underlying file. The result is therefore a deterministic four-byte write into
+the page cache of a file that the attacker only needs permission to read
 \cite{copyfail-research}.
 
 This limited primitive is the central building block of Copy Fail. It does not
@@ -112,9 +119,9 @@ gradually modify a larger region of a cached file
 The published Copy Fail exploit demonstrates this by targeting
 \code{/usr/bin/su}, a setuid-root executable commonly available on Linux systems.
 Successive four-byte writes are used to modify executable code in the cached
-image of the binary. The file itself remains owned by root and retains its setuid
-permissions because neither its filesystem metadata nor its persistent contents
-need to be changed.
+image of the binary. The file remains owned by root and retains its setuid
+metadata; the exploit only needs read access to poison the cached executable
+image.
 
 When the modified executable is started, Linux uses the poisoned page-cache
 contents while still applying the privileges associated with the original
@@ -125,18 +132,21 @@ combined with the vulnerable kernel path, is enough to cross the privilege
 boundary \cite{copyfail-research}.
 
 An additional characteristic of Copy Fail is that the corrupted page is not
-marked dirty for normal filesystem writeback. The modification therefore exists
-in memory while the corresponding data on persistent storage remains unchanged.
-This makes the corruption temporary from the filesystem's perspective, but that
-does not reduce its immediate impact: the attacker only needs the modified
-executable to run once to turn the page-cache write into a root shell
-\cite{copyfail-research}.
+marked dirty for normal filesystem writeback. This makes the modification
+volatile rather than a conventional persistent file write, but that does not
+reduce its immediate impact: the attacker only needs the modified executable to
+run once to turn the page-cache write into a root shell
+\cite{copyfail-research}. The laboratory later checks this distinction by
+comparing the mounted view with a direct read through the selected backing path
+and by recording the state after a reboot. These observations support the
+transient behaviour seen in the tested VM without claiming to trace every cache,
+block, and storage layer.
 
 The impact is also not necessarily limited to processes running directly on the
-host. Canonical notes that the same vulnerability may facilitate container escape
-scenarios in affected environments, extending the security implications beyond
-a conventional local privilege escalation
-\cite{ubuntu-copyfail-cve}.
+host. Canonical notes that the same vulnerability may facilitate container
+escape scenarios in affected environments \cite{ubuntu-copyfail-cve}. This
+project does not reproduce a container escape, so that impact remains published
+context rather than a laboratory result.
 
 The significance of Copy Fail is therefore much larger than the size of the
 individual write suggests. A four-byte primitive is enough to undermine the
@@ -150,7 +160,7 @@ temporary mitigation that removed access to the vulnerable kernel path rather
 than attempting to correct the underlying bug. An update to the \code{kmod}
 package prevented the \code{algif\_aead} module from being loaded, making the
 affected AF\_ALG AEAD interface unavailable through that module
-\cite{ubuntu-copyfail-cve}.
+\cite{ubuntu-copyfail-fixes}.
 
 If the module was already loaded, it additionally had to be unloaded or the
 system rebooted for the mitigation to become effective. Canonical explicitly
@@ -158,7 +168,7 @@ treated this as a temporary measure. Applications that rely on the kernel AEAD
 interface may fall back to userspace cryptographic implementations, but this
 behaviour is not guaranteed and disabling the module may therefore cause
 compatibility or functionality problems
-\cite{ubuntu-copyfail-cve}.
+\cite{ubuntu-copyfail-fixes}.
 
 The original Copy Fail research also proposes restricting the attack surface by
 preventing creation of AF\_ALG sockets through mechanisms such as seccomp. Like
@@ -182,14 +192,15 @@ the AF\_ALG and authentication code. Once a corrected kernel is installed and
 the system has been rebooted into it, the temporary module-level mitigation is
 no longer required. Canonical therefore recommends updating to a fixed kernel
 instead of relying permanently on disabling \code{algif\_aead}
-\cite{ubuntu-copyfail-cve}.
+\cite{ubuntu-copyfail-fixes}.
 
 This distinction is important for the experimental part of this project.
-Disabling the vulnerable interface can stop exploitation, but it does so by
-removing functionality. The kernel patch instead removes the vulnerable
-behaviour itself. Both approaches provide useful reference points when evaluating
-whether additional detection or mitigation techniques can identify or interrupt
-Copy Fail without simply disabling the affected subsystem.
+Disabling the vulnerable interface can stop the demonstrated path, but it does
+so by removing functionality. The kernel patch instead removes the vulnerable
+behaviour itself. Both approaches provide useful reference points when
+evaluating whether additional detection or mitigation techniques can identify
+or interrupt the tested Copy Fail path without simply disabling the affected
+subsystem.
 
 \subsection{Research Objectives and Questions}
 
@@ -209,13 +220,12 @@ The investigation is guided by the following research questions:
 \begin{description}
 
     \item[RQ1 Reproduction.]
-    Can Copy Fail be reproduced reliably in the isolated laboratory environment
-    by an ordinary, unprivileged local user?
+    Can Copy Fail be reproduced in the isolated laboratory environment by an
+    ordinary, unprivileged local user?
 
     \item[RQ2 Observability.]
-    Which system-level behaviours can be observed consistently while the
-    vulnerability is being exploited, and which of these provide useful
-    detection opportunities?
+    Which system-level behaviours can be observed while the vulnerability is
+    being exploited, and which of these provide useful detection opportunities?
 
     \item[RQ3 Detection.]
     Can the exploitation technique be detected using behavioural indicators
@@ -224,8 +234,8 @@ The investigation is guided by the following research questions:
 
     \item[RQ4 Compensating Control.]
     Can a defensive control interrupt the known exploitation path before the
-    kernel is patched, and can it do so without unnecessarily removing benign
-    functionality?
+    kernel is patched while preserving the benign operations selected for
+    control testing?
 
     \item[RQ5 Vendor Comparison.]
     How does the custom compensating control compare with Canonical's temporary
@@ -244,14 +254,19 @@ the vulnerability can be reproduced, but the more useful outcome is understandin
 what distinguishes the vulnerable behaviour, how defenders can react to it, and
 what changes once the underlying kernel flaw is actually removed.
 
+Each question is answered through one or more controlled experimental phases.
+The following chapters develop those answers in the same order as the
+laboratory workflow.
+
 \subsection{Scope and Safety}
 
 All experimentation in this project is restricted to systems owned and
 controlled for the purpose of the research and placed inside an isolated
 laboratory environment. No third-party or internet-facing systems are included
 in the test scope. The deliberately vulnerable reproduction target is kept
-separate from the patched reference system so that a known-good comparison state
-remains available throughout the project.
+separate from the reference VM so that a known-good comparison state remains
+available while the target moves through vulnerable, controlled, and patched
+states.
 
 Reproduction is performed from a dedicated unprivileged local account. For the
 purpose of this project, privilege escalation is considered successfully
@@ -273,7 +288,9 @@ modified system can be restored rather than treated as a clean reference.
 Experimental evidence is collected separately from the analytical report. Raw
 artifacts are preserved privately with integrity verification, while material
 intended for public release is sanitized where necessary and receives separate
-integrity verification after sanitization.
+integrity verification after sanitization. The public evidence package keeps
+the corresponding paths, manifest results, screenshots, and known limitations
+separate from the analytical narrative.
 
 These boundaries keep the experiment focused on understanding, observing, and
 defending against Copy Fail while ensuring that the reproduction remains

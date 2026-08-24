@@ -1,6 +1,8 @@
 \section{Behavioural Observation and Detection Engineering}
 \label{sec:behavioural-detection}
 
+\graphicspath{{../evidence/}{evidence/}}
+
 Chapter~5 established the controlled reproduction result and separated the
 decisive privilege transition from the accompanying filesystem observations.
 The same separation is necessary for detection engineering. A detector may
@@ -35,6 +37,15 @@ This chapter documents the detection model, candidate observables, protected
 target baseline, monitor implementation, controlled result, exact-sample
 comparison, and operational limitations. It then answers RQ2 and RQ3 within the
 evidence actually preserved by the experiment.
+
+\begin{evidencebox}
+Phase~03 is preserved under \path{evidence/03-detection/}, with the exact-hash
+comparison under \path{evidence/03-detection/yara-comparison/}. The main
+manifest lists 22 objects, of which 21 verify; the nested YARA manifest lists
+eight objects, of which seven verify. In both sets, the only failed digest is
+the corresponding \path{README.md}. All 28 experimental artifacts, detector
+files, rule files, and screenshots verify and are the evidence used below.
+\end{evidencebox}
 
 \subsection{Detection Model and Evidential Boundary}
 
@@ -237,6 +248,19 @@ attempt being denied. The machine-readable artifact establishes the ownership
 and mode; the denied write is screenshot evidence rather than a separately
 preserved command transcript.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.19\textheight,
+        keepaspectratio
+    ]{03-detection/screenshots/05-baseline-tamper-denied.png}
+    \caption{Attempted ordinary-user modification of the protected baseline.
+    The write was denied, and the root-owned file retained its recorded mode,
+    size, and SHA-256 digest.}
+    \label{fig:phase03-baseline-tamper-denied}
+\end{figure}
+
 Root ownership prevents the ordinary test account from silently replacing the
 expected values under the recorded permissions, but it is not a complete trust
 solution. The baseline must already be correct when generated, legitimate
@@ -303,6 +327,19 @@ monitor running under PID~3992. Its startup journal entries state:
 [2026-08-09T15:27:04.563143+00:00] Check interval: 0.25 seconds
 \end{lstlisting}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.20\textheight,
+        keepaspectratio
+    ]{03-detection/screenshots/10-mori-system-service-clean-state.png}
+    \caption{Journal capture after MORI was restarted as a system service. It
+    records the clean initial state, the 12 protected paths, the baseline path,
+    and the configured 0.25-second polling interval.}
+    \label{fig:phase03-mori-clean-service}
+\end{figure}
+
 At the later status capture, the service had been active for approximately
 1~hour 12~minutes and reported 6.0~MiB of memory, a 6.5~MiB peak, and
 52.947~seconds of accumulated CPU time. These values show that the service was
@@ -355,6 +392,19 @@ artifact independently preserves the mismatch event, while the screenshot
 provides the concurrent visual relationship between alert and successful
 exploitation.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.33\textheight,
+        keepaspectratio
+    ]{03-detection/screenshots/12-mori-detection-with-root-confirmation.png}
+    \caption{Controlled monitored execution. MORI reports the
+    \code{/usr/bin/su} digest mismatch in the journal while the adjacent
+    unprivileged session records the resulting UID~0 identity.}
+    \label{fig:phase03-mori-detection-root}
+\end{figure}
+
 \begin{table}[H]
     \centering
     \caption{Result of the monitored Copy Fail execution.}
@@ -392,6 +442,8 @@ a representative benign workload trial. Legitimate package replacement,
 administrative maintenance, or any other change to a covered executable would
 also produce a digest mismatch until the baseline was reviewed and updated.
 
+\clearpage
+
 \subsection{Exact-Sample YARA Comparison}
 
 The comparison experiment used YARA~4.5.0 on the same
@@ -411,6 +463,18 @@ CopyFail_Known_PoC_Exact_Hash /home/labuser/copy_fail_exp.py
 yara exit=0
 \end{lstlisting}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.96\textwidth,
+        height=0.13\textheight,
+        keepaspectratio
+    ]{03-detection/yara-comparison/screenshots/00-yara-known-poc-match.png}
+    \caption{The exact-hash YARA rule matches the original known laboratory
+    sample. The sample was scanned, not executed, for this comparison.}
+    \label{fig:phase03-yara-known-match}
+\end{figure}
+
 A private copy was then changed only by appending one trailing newline. Its
 size became 732~bytes and its SHA-256 digest became:
 
@@ -425,6 +489,19 @@ identified the byte-for-byte sample for which it was written and failed after
 a trivial byte-level change. It does not prove that the modified file remained
 operational, evaded a more general rule, or would evade other static, semantic,
 or behavioural detection methods.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.96\textwidth,
+        height=0.25\textheight,
+        keepaspectratio
+    ]{03-detection/yara-comparison/screenshots/01-yara-harmless-variant-no-match.png}
+    \caption{Exact-sample comparison after appending one trailing newline. The
+    resulting 732-byte variant received a different SHA-256 digest and did not
+    match the rule; it was deliberately not executed.}
+    \label{fig:phase03-yara-variant-no-match}
+\end{figure}
 
 This narrow result must not be generalised into a criticism of YARA itself.
 YARA rules may use strings, byte patterns, structural properties, modules, and
@@ -505,10 +582,6 @@ matters: the exact-hash rule ceased to match after a trivial, non-executed
 variation, whereas MORI's decision was anchored to the protected target's
 deviation from known-good state.
 
-The answer is not that MORI uniquely identifies Copy Fail. It detects a
-security-relevant integrity violation consistent with the reproduced
-technique. Attribution would require additional correlation, and timely
-prevention requires a control placed earlier in the attack path. The next
-chapter therefore moves from observing the changed privileged target to
-evaluating a compensating control intended to interrupt the known exploitation
-sequence before the privilege boundary is crossed.
+MORI detects an integrity violation consistent with Copy Fail, not unique
+attribution. Chapter~7 therefore evaluates a compensating control designed to
+interrupt the tested sequence before privilege is gained.

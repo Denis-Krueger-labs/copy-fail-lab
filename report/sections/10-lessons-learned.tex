@@ -1,6 +1,8 @@
 \section{Evaluation and Conclusion}
 \label{sec:evaluation-conclusion}
 
+\graphicspath{{../evidence/}{evidence/}}
+
 Chapter~9 closed the experimental sequence by showing that the two tested Copy
 Fail implementations no longer produced the unauthorised privilege transition
 on the corrected Ubuntu kernel. This final chapter does not introduce another
@@ -21,13 +23,28 @@ evidence can support.
 
 The overall result is positive, but intentionally asymmetric. Reproduction was
 demonstrated for a specific reconstructed Ubuntu environment. Detection used a
-behavioural integrity signal that was independent of the sample identity, but
-that signal did not uniquely attribute Copy Fail. MORI v2.7 selectively denied
-the two tested same-process exploitation paths while preserving the exercised
-interface operations, but it retained explicit bypass, lifecycle, and fail-open
-boundaries. The corrected vendor kernel produced the strongest operational
-result because it removed the reproduced behaviour while leaving the tested
-AF\_ALG interface available.
+behavioural integrity signal whose decision did not depend on the proof-of-
+concept identity, but that signal did not uniquely attribute Copy Fail. MORI
+v2.7 selectively denied the two tested same-process exploitation paths while
+preserving the exercised interface operations, but it retained explicit bypass,
+lifecycle, and fail-open boundaries. The corrected vendor kernel produced the
+strongest operational result because it removed the reproduced behaviour while
+leaving the tested AF\_ALG interface operations available.
+
+\begin{evidencebox}
+The final synthesis is anchored to the evidence already evaluated in the
+experimental chapters. The decisive checkpoints are the vulnerable UID~0
+transition and read-path divergence
+(\cref{fig:phase02-uid0-transition,fig:phase02-view-divergence}), MORI's
+behavioural alert (\cref{fig:phase03-mori-detection-root}), selective denial of
+the Python and independent C paths
+(\cref{fig:phase04-v27-python-denied,fig:phase04-v27-c-denied}), the vendor and
+custom module-policy captures
+(\cref{fig:phase01-vendor-kmod-reference,fig:phase04-v1-guard-config-comparison}),
+and the patched-runtime regression results
+(\cref{fig:phase05-python-poc-regression,fig:phase05-c-poc-regression,fig:phase05-final-target-integrity}).
+No new experimental evidence is introduced in this chapter.
+\end{evidencebox}
 
 \subsection{Consolidated Findings}
 
@@ -53,8 +70,9 @@ and the boundary that must remain attached to it.
         RQ1 &
         Yes. On Ubuntu kernel \code{6.8.0-116-generic}, a command launched from
         the recorded UID~1001 \code{labuser} context produced a UID~0 shell. &
-        Repeatability was demonstrated on one reconstructed VM, not quantified
-        across hosts, kernels, workloads, or timing conditions. \\
+        Operational repeatability was observed on one reconstructed VM. The
+        preserved vulnerable launch has no immediate pre-launch sample hash,
+        and no cross-host or statistical trial matrix was collected. \\
 
         RQ2 &
         The changed mounted view of \code{/usr/bin/su} was the most consistent
@@ -64,15 +82,17 @@ and the boundary that must remain attached to it.
         entire lower-level exploit chain. \\
 
         RQ3 &
-        Yes. MORI detected deviation from a known-good privileged target without
-        matching the proof-of-concept filename, language, or exact sample hash. &
+        Yes. MORI detected deviation from a known-good privileged target using
+        logic that did not match the proof-of-concept filename, language, or
+        exact sample hash. &
         The digest mismatch was cause-agnostic, target-bounded, and observed
-        after the changed view existed; it did not uniquely identify Copy Fail. \\
+        after the changed view existed. It did not uniquely identify Copy Fail
+        or measure time to alert. \\
 
         RQ4 &
-        Yes, within the tested model. MORI v2.7 denied both preserved
-        proof-of-concept paths before privilege escalation while the exercised
-        benign interface operations remained available. &
+        Yes, within the tested model. MORI v2.7 denied the preserved Python and
+        independent C same-process paths before privilege escalation while the
+        exercised benign interface operations remained available. &
         The result does not cover every process split, lifecycle edge case,
         allocation failure, target, workload, or future exploit variation. \\
 
@@ -84,12 +104,13 @@ and the boundary that must remain attached to it.
         assurance obligations that the packaged vendor mitigation avoids. \\
 
         RQ6 &
-        Yes. On kernel \code{6.8.0-137-generic}, both tested implementations
-        failed to reproduce the prior transition while the tested AF\_ALG
-        operations remained reachable and the target retained its known-good
-        state. &
-        The retest was not a perfect single-variable trial and did not directly
-        trace the corrected internal scatter-gather path. \\
+        Yes, within the captured retest. On kernel
+        \code{6.8.0-137-generic}, the Python path no longer produced its prior
+        UID~0 outcome, the independent C path also remained unprivileged, and
+        the exercised AF\_ALG operations remained reachable. &
+        The identities differed between the vulnerable and patched Python runs,
+        the C path lacks a preserved successful unmitigated vulnerable run, and
+        the benign control did not perform encryption or decryption. \\
         \bottomrule
     \end{tabularx}
 \end{table}
@@ -97,10 +118,11 @@ and the boundary that must remain attached to it.
 Taken together, these answers establish more than a successful exploit and a
 subsequent failed retest. The vulnerable-side evidence records an ordinary-user
 starting state, the direct UID~0 result, the altered mounted view, the divergent
-backing-filesystem read, and recovery after reboot. The defensive phases then
-show three distinct responses to that path: observing its consequence, denying
-selected prerequisites or correlations, and removing the underlying vulnerable
-behaviour through the kernel correction.
+backing-filesystem read, and recovery after reboot
+(\cref{fig:phase02-pre-exploit,fig:phase02-uid0-transition,fig:phase02-view-divergence,fig:phase02-reboot-recovery}).
+The defensive phases then show three distinct responses to that path: observing
+its consequence, denying selected prerequisites or correlations, and removing
+the underlying vulnerable behaviour through the kernel correction.
 
 The differences between those responses are security-relevant. Detection can
 support investigation without preventing impact. A broad temporary mitigation
@@ -114,10 +136,13 @@ at its source and therefore remains the appropriate end state.
 The detection work produced a useful behavioural result, but not a universal
 Copy Fail signature. MORI's integrity monitor compared protected privileged
 targets with a known-good baseline and detected the changed mounted view of
-\code{/usr/bin/su}. That decision did not depend on whether the proof of concept
-was written in Python or C, what the file was called, or whether a trivial byte
-change altered its sample hash. In that narrow sense, the detector generalised
-beyond the specific published artifact.
+\code{/usr/bin/su}. Its decision logic did not inspect the proof-of-concept
+filename, language, or sample hash. The exact-hash YARA comparison, by contrast,
+stopped matching after a harmless one-byte variation
+(\cref{fig:phase03-yara-known-match,fig:phase03-yara-variant-no-match}). This
+supports the architectural distinction between behavioural and exact-sample
+detection. It does not demonstrate equal detection coverage for every possible
+implementation.
 
 It did not generalise to unique vulnerability attribution. A changed digest can
 also be caused by an authorised package update, corruption, an administrative
@@ -133,7 +158,7 @@ impact, but an alert produced after privilege escalation cannot be presented as
 prevention. Polling also creates a sampling boundary: a deviation that appears
 and disappears between complete scans may not be observed. The configured
 sleep interval was an implementation setting, not a measured end-to-end alert
-latency.
+latency, and the experiment therefore reports no time-to-alert metric.
 
 The detection evaluation was further limited by coverage and trust:
 
@@ -177,7 +202,8 @@ bind, and accept operations and denied the correlated SUID-to-pipe operation for
 the Python and independent C paths. The same suite also showed that individual
 signals, an alternate target, a cross-TGID sequence, and the monitor's own
 expected reads were not indiscriminately denied. This demonstrated selectivity
-relative to v1, not universal compatibility.
+relative to v1, not universal compatibility
+(\cref{fig:phase04-v27-python-denied,fig:phase04-v27-python-post-state,fig:phase04-v27-c-denied,fig:phase04-v22-benign-bind}).
 
 The price of that selectivity is a larger assumption surface. The policy depends
 on BPF LSM and BTF/CO-RE support, privileged deployment, correct process and
@@ -249,11 +275,13 @@ failed.
 The evidence workflow was strongest where independent observations converged.
 Examples include the ordinary-user baseline followed by direct UID~0 output,
 the mounted-view and backing-filesystem digest comparison, the paired positive
-and negative MORI controls, the preserved sample hashes, and the patched-side
-combination of interface availability with absent privilege transition. Phase
-separation, VM snapshots, manifests, and explicit target-state checks made it
-possible to relate those observations without treating every screenshot as a
-self-sufficient proof.
+and negative MORI controls, and the patched-side combination of interface
+availability with absent privilege transition. Captured sample hashes add
+provenance where they exist, while the missing immediate vulnerable-side Python
+hash and the failed machine-readable C capture remain explicit gaps. Phase
+separation, VM snapshots, manifests, and target-state checks made it possible to
+relate those observations without treating every screenshot as self-sufficient
+proof.
 
 The workflow was weaker where provenance depended on filenames, documentation,
 or inferred chronology. The misnamed Phase~05 baseline, failed machine-readable
@@ -322,43 +350,43 @@ assurance gap:
     reproduction rather than being inferred from this local privilege-escalation
     study.
 
-    \item \textbf{Retire temporary controls after remediation.} Validate the
-    fixed kernel, remove obsolete module or BPF policies, and confirm that
-    normal application behaviour is restored. A successful workaround should
-    not become permanent infrastructure by accident.
+    \item \textbf{Retire temporary controls after remediation.} After
+    validating the fixed kernel, remove obsolete module or BPF policies and
+    recheck the applications that depended on the affected interface.
 \end{enumerate}
 
-These priorities do not change the present result. They identify where a future
-study could convert bounded laboratory confidence into broader deployment
-evidence. Until that work exists, MORI v2.7 remains a research-grade example of
-selective behavioural prevention, not a production recommendation.
+These priorities identify how future work could broaden the present laboratory
+evidence. Until then, MORI v2.7 remains a research-grade example of selective
+behavioural prevention, not a production recommendation.
 
 \subsection{Conclusion}
 
-This project began with a published local privilege-escalation technique and
-asked a larger question than whether it could print a root prompt. The isolated
-laboratory reconstructed the vulnerable Ubuntu runtime, recorded an ordinary
-UID~1001 starting state, and directly validated the transition to UID~0. It then
-separated that decisive result from the accompanying mounted-view anomaly,
-showing that the normal VFS path returned changed content while a direct ext4
-read retained the original digest and that reboot restored the mounted view.
+This project asked more than whether a published local privilege-escalation
+technique could print a root prompt. The laboratory reconstructed the vulnerable
+Ubuntu runtime, recorded a UID~1001 starting state, and directly validated the
+transition to UID~0. It then separated that result from the mounted-view anomaly:
+the normal VFS path returned changed content, a direct ext4 read retained the
+original digest, and reboot restored the mounted view.
 
 The observation phase turned that effect into a behavioural integrity signal.
-MORI detected the protected target's deviation without binding the decision to
-one proof-of-concept filename or hash, but did not claim unique attribution or
-prevention. The control phase then made the trade-off between breadth and
-selectivity visible. Broad module denial interrupted the known path at the cost
-of the tested interface. MORI v2.7 preserved the exercised interface operations
-and denied the two tested correlated exploit paths, but only within a documented
-process, lifecycle, and deployment model.
+MORI detected the target deviation without binding its decision to one filename
+or hash, but it did not provide unique attribution or prevention. Broad module
+denial then interrupted the known path at the cost of the tested interface.
+MORI v2.7 preserved the exercised operations and denied two correlated paths,
+but only within its documented process, lifecycle, and deployment model.
 
-The vendor comparison prevented the custom result from becoming the wrong final
-answer. Canonical's packaged module rule remained the preferable broad emergency
-measure when temporary interface loss was acceptable. More importantly, neither
-temporary control replaced the corrected kernel. On the final patched runtime,
-the affected module loaded, the tested benign operations remained reachable,
-both proof-of-concept implementations failed to reproduce the prior privilege
-transition, and \code{/usr/bin/su} retained its known-good captured state.
+The vendor comparison kept the custom result in its proper role. Canonical's
+packaged module rule remained preferable for broad emergency containment when
+temporary interface loss was acceptable, and neither temporary control replaced
+the corrected kernel. On the patched runtime, the affected module loaded and
+the exercised socket, bind, and accept operations remained reachable
+(\cref{fig:phase05-patched-runtime-isolation,fig:phase05-benign-aead-control}).
+The Python path did not reproduce its documented vulnerable-side UID~0 outcome,
+the independent C path also remained unprivileged, and \code{/usr/bin/su}
+retained its known-good captured state
+(\cref{fig:phase05-python-poc-regression,fig:phase05-c-poc-regression,fig:phase05-final-target-integrity}).
+That last observation establishes the target state at capture time, not a
+continuous integrity guarantee.
 
 The final conclusion is therefore:
 
@@ -368,26 +396,22 @@ tested vulnerable Ubuntu kernel and observable through a repeatable
 privileged-target integrity deviation.
 
 Behavioural detection and selective temporary prevention were possible
-for the demonstrated path, but neither uniquely attributed every event
-nor provided universal protection.
+for the demonstrated path, but neither supplied unique attribution nor
+universal protection.
 
-The corrected vendor kernel removed the reproduced behaviour while
-preserving the tested AF_ALG interface operations. It is the appropriate
-final remediation for the tested system.
+The corrected vendor kernel removed the reproduced Python-path behaviour,
+while the independent C path also remained unprivileged. The tested
+AF_ALG socket, bind, and accept operations remained available, making
+the vendor kernel the appropriate final remediation for this system.
 \end{lstlisting}
 
-That statement is deliberately narrower than a universal security claim. The
-project used one principal vulnerable VM, one Ubuntu kernel line, two preserved
-proof-of-concept implementations, a bounded target set, and a finite regression
-suite. It did not reproduce a container escape, prove every exploit variant,
-measure a population-level success rate, or establish production readiness for
-the custom control. Those limits are part of the result rather than exceptions
-to it.
+That statement is deliberately narrow. The project used one principal vulnerable
+VM, one Ubuntu kernel line, one documented Python reproduction, an independent C
+implementation in later tests, a bounded target set, and a finite regression
+suite. The C path was not preserved succeeding unmitigated on the vulnerable
+kernel. No container escape, universal exploit coverage, population-level
+success rate, or production readiness for MORI was demonstrated.
 
-The lasting output is therefore not only the UID~0 screenshot, the MORI deny
-message, or the patched-side failure. It is the complete evidence-linked path
-between them: vulnerable state, demonstrated impact, observable consequence,
-temporary control, vendor comparison, and validated remediation. The project
-ends where temporary controls should end---with the underlying flaw corrected,
-the tested functionality restored, and the remaining uncertainty stated
-openly.
+The lasting output is an evidence-linked path from demonstrated impact through
+observation and temporary control to vendor remediation, with the remaining
+uncertainty stated openly.

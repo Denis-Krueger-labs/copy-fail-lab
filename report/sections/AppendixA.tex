@@ -1,0 +1,421 @@
+\section{Evidence Catalogue and Consistency Audit}
+\label{app:evidence-audit}
+
+\graphicspath{{../evidence/}{evidence/}}
+
+This appendix connects the analytical report to the separately preserved
+public evidence package. It has three purposes: to identify the evidence
+snapshot used during report preparation, to record the result of an independent
+manifest and consistency check, and to provide a visual index of every public
+screenshot without treating the report itself as the raw-evidence store.
+
+The full-resolution PNG captures, command output, source, configuration,
+generated objects, binaries, and phase manifests remain under
+\path{evidence/}. This revision renders the original screenshot files directly
+from that tree. The filename shown below each capture is therefore also the
+repository-relative source path. The figures provide visual coverage, while the
+phase manifests remain authoritative for exact bytes and integrity checks.
+
+% One declared visual sheet now occupies exactly one physical page.  Version 1
+% used ordinary float pages, which allowed LaTeX to combine two short sheets and
+% occasionally pushed their contents into the header area.
+\newcommand{\evidencepath}[1]{%
+    \par\smallskip
+    \begingroup
+        \centering
+        \scriptsize\ttfamily\color{MoriMuted}%
+        \expandafter\path\expandafter{\detokenize{#1}}\par
+    \endgroup
+}
+
+\newcommand{\evidencepair}[3]{%
+    \begin{figure}[H]
+        \centering
+        \includegraphics[
+            width=\textwidth,
+            height=0.35\textheight,
+            keepaspectratio
+        ]{#1}
+        \evidencepath{#1}
+        \vspace{1.1em}
+        \includegraphics[
+            width=\textwidth,
+            height=0.35\textheight,
+            keepaspectratio
+        ]{#2}
+        \evidencepath{#2}
+        \caption{#3}
+    \end{figure}
+    \clearpage
+}
+
+\newcommand{\evidencesidebyside}[3]{%
+    \begin{figure}[H]
+        \centering
+        \begin{minipage}[t]{0.48\textwidth}
+            \centering
+            \includegraphics[
+                width=\linewidth,
+                height=0.68\textheight,
+                keepaspectratio
+            ]{#1}
+            \evidencepath{#1}
+        \end{minipage}%
+        \hfill
+        \begin{minipage}[t]{0.48\textwidth}
+            \centering
+            \includegraphics[
+                width=\linewidth,
+                height=0.68\textheight,
+                keepaspectratio
+            ]{#2}
+            \evidencepath{#2}
+        \end{minipage}
+        \caption{#3}
+    \end{figure}
+    \clearpage
+}
+
+\newcommand{\evidencesingle}[2]{%
+    \begin{figure}[H]
+        \centering
+        \includegraphics[
+            width=\textwidth,
+            height=0.76\textheight,
+            keepaspectratio
+        ]{#1}
+        \evidencepath{#1}
+        \caption{#2}
+    \end{figure}
+    \clearpage
+}
+
+\subsection{Evidence Snapshot and Authority}
+
+The audit used the intact repository snapshot at commit:
+
+\begin{lstlisting}
+d78fce4f0aa9554a5f9f19503b75056f75209619
+\end{lstlisting}
+
+That snapshot contains the complete public evidence tree through MORI v2.7 and
+Phase~05. Two more recent
+uploaded ZIP copies lacked their end-of-central-directory records and ended
+inside compressed entries. A controlled local-header recovery found 185 and
+147 entries respectively, but each final recovered entry failed decompression.
+They were therefore used only for comparison and were not promoted over the
+intact repository snapshot. A third, older ZIP was structurally valid but ended
+at an earlier report and evidence state.
+
+This selection rule avoids two opposite errors: accepting a newer filename as
+proof of completeness, or silently falling back to an older package without
+checking whether later MORI and vendor-validation evidence exists elsewhere.
+The ZIP digests and recovery results are retained in the accompanying audit
+supplement.
+
+\subsection{Public-Manifest Verification}
+\label{app:evidence-manifest-audit}
+
+The seven selected public manifests contain 220 unique entries. The Phase~04
+manifest already repeats the 108 entries from the nested MORI v2 manifest, so
+the nested list is verified but not added to the total a second time. The audit
+result is shown in \cref{tab:evidence-manifest-audit}.
+
+\begin{table}[H]
+    \centering
+    \caption{Independent verification of the authoritative public manifests.}
+    \label{tab:evidence-manifest-audit}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.28\textwidth}>{\centering\arraybackslash}p{0.12\textwidth}>{\centering\arraybackslash}p{0.12\textwidth}Y@{}}
+        \toprule
+        Evidence set & Listed & Verified & Recorded exception \\
+        \midrule
+        Phase 00 baseline & 20 & 20 & None. \\
+        Phase 01 validation & 14 & 14 & None. \\
+        Phase 02 reproduction & 12 & 11 & The listed \code{README.md} digest is stale. \\
+        Phase 03 detection & 22 & 21 & The listed \code{README.md} digest is stale. \\
+        Phase 03 YARA comparison & 8 & 7 & The listed \code{README.md} digest is stale. \\
+        Phase 04 custom mitigation & 126 & 126 & None. \\
+        Phase 05 patched validation & 18 & 18 & None. \\
+        \midrule
+        Total & 220 & 217 & Three documentation-only mismatches. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Every non-README entry in the three affected manifests verified. Those three
+README files are consequently used as explanatory documentation, not as
+integrity-verified experimental objects. The report does not regenerate the
+original manifests and pretend that the earlier frozen lists never existed;
+the exact expected and observed README digests are preserved in the audit
+supplement.
+
+A second documentation mismatch concerns inventory rather than content. The
+inner MORI v2 README still states 45 artifacts and 40 screenshots, for an
+85-object package. The current verified MORI v2 manifest instead contains 49
+implementation or provenance artifacts and 59 screenshots, for 108 objects.
+The manifest, directory contents, and Phase~04 index agree on 108, so that is
+the authority used in Chapters~7 and~10.
+
+\subsection{VM 270 Hypervisor Supplement}
+
+The operator-supplied Proxmox transcript for VM~270 was reconstructed from the
+terminal output provided during report preparation. Rehashing the exact byte
+sequence produced:
+
+\begin{lstlisting}
+698bfb469060ea9bc0b9d5afdc8636c7c551db9b3f388181a4353f710e501073
+\end{lstlisting}
+
+This equals the digest displayed by the original \code{sha256sum} command. The
+capture records VM~270 as stopped on 13 August 2026 at 21:53:07+02:00, names
+\code{clean-baseline-00} as its parent, and places the current state below that
+snapshot. The exact transcript contains MAC, storage-volume, SMBIOS, and
+VM-generation identifiers, so it remains in the private audit set. The
+sanitised publication copy retains the evidential fields used in Chapter~3 and
+has SHA-256:
+
+\begin{lstlisting}
+706cbe7fa1a2700ff00d7b7ac5394ddeed8811e5ba5397fa8b71d830e9c3089c
+\end{lstlisting}
+
+\subsection{Phase 00: Clean Reference Baseline}
+\label{app:evidence-phase00}
+
+\begin{evidencebox}
+\textbf{Public path:} \path{evidence/00-baseline/}
+
+\textbf{Manifest:} \path{evidence/00-baseline/hashes/PUBLIC-SHA256SUMS}
+
+\textbf{Coverage:} 20 verified command-output artifacts covering guest
+identity, kernel and package state, networking, listeners, storage, and the
+recorded kernel-image digest. The phase has no public screenshot directory.
+
+\textbf{Boundary:} the baseline fixes the guest's documented starting state;
+it does not independently establish the semantic correctness of each command,
+the contents of the unexported VM disk, or Copy Fail exploitability.
+\end{evidencebox}
+
+The private and public baseline manifests intentionally describe different
+byte sets where publication redaction changed guest identifiers. The public
+manifest is repeatable from the publication package; the historical private
+verification depends on the separately retained originals. The VM~270
+hypervisor supplement adds snapshot existence and ancestry without turning a
+snapshot label into proof of every guest-state claim.
+
+\subsection{Phase 01: Reference-System Validation}
+\label{app:evidence-phase01}
+
+\begin{evidencebox}
+\textbf{Public path:} \path{evidence/01-vulnerability-validation/}
+
+\textbf{Manifest:}
+\path{evidence/01-vulnerability-validation/PUBLIC-SHA256SUMS}
+
+\textbf{Coverage:} seven verified text artifacts and seven verified
+screenshots covering the running kernel, package versions, module metadata,
+kernel configuration, effective module policy, dry-run resolution, and the
+negative loaded-module result.
+
+\textbf{Boundary:} no proof of concept was run on VM~270. The phase establishes
+that the reference machine was unsuitable for direct reproduction, not which
+one of its two protective conditions would independently have stopped a trial.
+\end{evidencebox}
+
+\evidencepair{01-vulnerability-validation/screenshots/01-validation-integrity-check.png}{01-vulnerability-validation/screenshots/02-patched-kernel-and-kmod.png}{Phase 01 reference-validation screenshots, visual page 1 of 4.}
+\evidencepair{01-vulnerability-validation/screenshots/03-algif-aead-mitigation-active.png}{01-vulnerability-validation/screenshots/04-algif-aead-module-and-kernel-config.png}{Phase 01 reference-validation screenshots, visual page 2 of 4.}
+\evidencepair{01-vulnerability-validation/screenshots/05-algif-aead-not-loaded.png}{01-vulnerability-validation/screenshots/06-local-transfer-integrity-check.png}{Phase 01 reference-validation screenshots, visual page 3 of 4.}
+\evidencesingle{01-vulnerability-validation/screenshots/07-screenshot-integrity-check.png}{Phase 01 reference-validation screenshots, visual page 4 of 4.}
+\clearpage
+
+\subsection{Phase 02: Controlled Reproduction}
+\label{app:evidence-phase02}
+
+\begin{evidencebox}
+\textbf{Public path:} \path{evidence/02-reproduction/}
+
+\textbf{Manifest:} \path{evidence/02-reproduction/PUBLIC-SHA256SUMS}
+
+\textbf{Coverage:} five machine-readable artifacts and six screenshots
+covering the clean pre-state, module state, UID~0 result, post-shell state,
+mounted-versus-backing view, and reboot recovery. Screenshot ID~04 remains
+intentionally absent because it exposed the complete proof-of-concept source.
+
+\textbf{Boundary:} the 11 captured objects verify; the README's listed digest
+does not. The preserved vulnerable launch has no immediate pre-launch sample
+hash, so exact Python-source identity is documentation-level provenance. The
+different target digests establish observed read-path divergence, not a complete
+block-forensic or on-disk replacement claim. Reboot recovery does not remediate
+the vulnerable kernel.
+\end{evidencebox}
+
+\evidencepair{02-reproduction/screenshots/01-pre-exploit-state.png}{02-reproduction/screenshots/02-algif-aead-loaded.png}{Phase 02 controlled-reproduction screenshots, visual page 1 of 3.}
+\evidencepair{02-reproduction/screenshots/03-privilege-escalation-success.png}{02-reproduction/screenshots/05-post-exploit-state.png}{Phase 02 controlled-reproduction screenshots, visual page 2 of 3.}
+\evidencepair{02-reproduction/screenshots/06-page-cache-vs-backing-filesystem.png}{02-reproduction/screenshots/07-reboot-restores-original-file.png}{Phase 02 controlled-reproduction screenshots, visual page 3 of 3.}
+\clearpage
+
+\subsection{Phase 03: Detection and Exact-Sample Comparison}
+\label{app:evidence-phase03}
+
+\begin{evidencebox}
+\textbf{Public path:} \path{evidence/03-detection/}
+
+\textbf{Comparison path:}
+\path{evidence/03-detection/yara-comparison/}
+
+\textbf{Coverage:} detector artifacts, the MORI implementation and systemd
+unit, 13 detector screenshots, five YARA artifacts, and two YARA screenshots.
+All 28 captured objects verify; only the two listed README digests fail.
+
+\textbf{Boundary:} MORI establishes a protected-target integrity deviation and
+the exact-sample comparison establishes one match/non-match pair. Neither alone
+attributes every deviation to Copy Fail, measures detection latency, or
+evaluates YARA beyond the exact-hash rule used here.
+\end{evidencebox}
+
+\evidencepair{03-detection/screenshots/00-suid-target-surface.png}{03-detection/screenshots/01-suid-accessibility.png}{Phase 03 MORI detection screenshots, visual page 1 of 7.}
+\evidencepair{03-detection/screenshots/02-suid-known-good-baseline.png}{03-detection/screenshots/03-fusermount3-usrmerge-verification.png}{Phase 03 MORI detection screenshots, visual page 2 of 7.}
+\evidencepair{03-detection/screenshots/04-protected-baseline.png}{03-detection/screenshots/05-baseline-tamper-denied.png}{Phase 03 MORI detection screenshots, visual page 3 of 7.}
+\evidencesidebyside{03-detection/screenshots/06a-mori-integrity-watcher-poc-part1.png}{03-detection/screenshots/06b-mori-integrity-watcher-poc-part2.png}{Phase 03 MORI detection screenshots, visual page 4 of 7.}
+\evidencepair{03-detection/screenshots/07-mori-integrity-monitor-baseline.png}{03-detection/screenshots/09-mori-systemd-service-active.png}{Phase 03 MORI detection screenshots, visual page 5 of 7.}
+\evidencepair{03-detection/screenshots/10-mori-system-service-clean-state.png}{03-detection/screenshots/11-mori-detects-copyfail.png}{Phase 03 MORI detection screenshots, visual page 6 of 7.}
+\evidencesingle{03-detection/screenshots/12-mori-detection-with-root-confirmation.png}{Phase 03 MORI detection screenshots, visual page 7 of 7.}
+\evidencepair{03-detection/yara-comparison/screenshots/00-yara-known-poc-match.png}{03-detection/yara-comparison/screenshots/01-yara-harmless-variant-no-match.png}{Phase 03 exact-sample YARA comparison, visual page 1 of 1.}
+\clearpage
+
+\subsection{Phase 04: Custom Mitigation and MORI v2.7}
+\label{app:evidence-phase04}
+
+\begin{evidencebox}
+\textbf{Public path:} \path{evidence/04-custom-mitigation/}
+
+\textbf{Manifest:}
+\path{evidence/04-custom-mitigation/PUBLIC-SHA256SUMS.txt}
+
+\textbf{Coverage:} 126 verified objects: ten MORI Guard v1 artifacts, eight v1
+screenshots, 49 MORI v2 implementation or provenance artifacts, and 59 MORI v2
+screenshots. The screenshot sequence retains false positives, negative
+controls, historical checkpoints, the v2.6.2 expiry bypass, the first v2.7
+failure, the corrected regression, two final PoC paths, and final provenance.
+
+\textbf{Boundary:} the frozen v2.7 result applies to the tested same-process
+paths and controls. A later provenance capture on the patched runtime verifies
+the transferred artifact hashes; it does not replace the vulnerable-kernel test
+context or establish universal prevention and compatibility.
+\end{evidencebox}
+
+\subsubsection{MORI Guard v1 visual index}
+
+\evidencepair{04-custom-mitigation/screenshots/00-mori-guard-configuration.png}{04-custom-mitigation/screenshots/01-mori-guard-denies-module-load.png}{Phase 04 MORI Guard v1 screenshots, visual page 1 of 4.}
+\evidencepair{04-custom-mitigation/screenshots/02-mori-guard-final-message.png}{04-custom-mitigation/screenshots/03-pre-mitigation-test-state.png}{Phase 04 MORI Guard v1 screenshots, visual page 2 of 4.}
+\evidencepair{04-custom-mitigation/screenshots/04-copyfail-blocked-by-mori-guard.png}{04-custom-mitigation/screenshots/05-mori-guard-block-event.png}{Phase 04 MORI Guard v1 screenshots, visual page 3 of 4.}
+\evidencepair{04-custom-mitigation/screenshots/06-mori-guard-post-attempt-verification.png}{04-custom-mitigation/screenshots/07-mori-guard-blocker-source.png}{Phase 04 MORI Guard v1 screenshots, visual page 4 of 4.}
+\clearpage
+
+\subsubsection{MORI v2 development and final-validation visual index}
+
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/00-mori-v2-identifies-mori-monitor-process.png}{04-custom-mitigation/mori-v2/screenshots/01-mori-v2-false-positive-mori-monitor.png}{Phase 04 MORI v2 screenshots, visual page 1 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/02-mori-monitor-service-context.png}{04-custom-mitigation/mori-v2/screenshots/03-mori-v2-1-1-trusted-monitor-loaded.png}{Phase 04 MORI v2 screenshots, visual page 2 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/04-mori-v2-1-1-trusted-monitor-suppressed.png}{04-custom-mitigation/mori-v2/screenshots/05-mori-v2-1-1-untrusted-suid-read-detected.png}{Phase 04 MORI v2 screenshots, visual page 3 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/06-mori-v2-1-1-implementation-hashes.png}{04-custom-mitigation/mori-v2/screenshots/07-mori-v2-1-2-monitor-trust-verified.png}{Phase 04 MORI v2 screenshots, visual page 4 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/08-mori-v2-1-2-verified-monitor-suppressed.png}{04-custom-mitigation/mori-v2/screenshots/09-mori-v2-1-2-untrusted-suid-read-detected.png}{Phase 04 MORI v2 screenshots, visual page 5 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/10-mori-v2-1-2-tampered-monitor-trust-refused.png}{04-custom-mitigation/mori-v2/screenshots/11-mori-v2-1-2-refused-monitor-becomes-visible.png}{Phase 04 MORI v2 screenshots, visual page 6 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/12-mori-v2-1-2-restored-monitor-trust-recovered.png}{04-custom-mitigation/mori-v2/screenshots/13-mori-v2-1-2-final-artifact-hashes.png}{Phase 04 MORI v2 screenshots, visual page 7 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/14-mori-v2-2-aead-bind-attempt-observed.png}{04-custom-mitigation/mori-v2/screenshots/15-mori-v2-2-v1-guard-intercepts-algif-aead.png}{Phase 04 MORI v2 screenshots, visual page 8 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/16-mori-v2-2-benign-aead-bind-preserved.png}{04-custom-mitigation/mori-v2/screenshots/17-mori-v2-2-final-artifact-hashes.png}{Phase 04 MORI v2 screenshots, visual page 9 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/18-mori-v2-3-ktime-helper-verifier-probe.png}{04-custom-mitigation/mori-v2/screenshots/19-mori-v2-3-same-tgid-aead-suid-correlation.png}{Phase 04 MORI v2 screenshots, visual page 10 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/20-mori-v2-3-correlation-window-expires.png}{04-custom-mitigation/mori-v2/screenshots/21-mori-v2-3-suid-only-negative-control.png}{Phase 04 MORI v2 screenshots, visual page 11 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/22-mori-v2-3-final-artifact-hashes.png}{04-custom-mitigation/mori-v2/screenshots/23-mori-v2-4-benign-file-pipe-splice-observed.png}{Phase 04 MORI v2 screenshots, visual page 12 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/24-mori-v2-4-suid-file-pipe-splice-observed.png}{04-custom-mitigation/mori-v2/screenshots/25-mori-v2-4-splice-probe-hashes.png}{Phase 04 MORI v2 screenshots, visual page 13 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/26-mori-v2-4-cross-hook-splice-state-correlation.png}{04-custom-mitigation/mori-v2/screenshots/27-mori-v2-4-aead-splice-suid-triple-correlation.png}{Phase 04 MORI v2 screenshots, visual page 14 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/28-mori-v2-4-final-artifact-hashes.png}{04-custom-mitigation/mori-v2/screenshots/29-mori-v2-5-shadow-policy-would-deny.png}{Phase 04 MORI v2 screenshots, visual page 15 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/30-mori-v2-5-aead-only-negative-control.png}{04-custom-mitigation/mori-v2/screenshots/31-mori-v2-5-splice-only-negative-control.png}{Phase 04 MORI v2 screenshots, visual page 16 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/32-mori-v2-5-final-artifact-hashes.png}{04-custom-mitigation/mori-v2/screenshots/33-mori-v2-6-selective-enforcement-blocks-correlated-splice.png}{Phase 04 MORI v2 screenshots, visual page 17 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/34-mori-v2-6-final-artifact-hashes.png}{04-custom-mitigation/mori-v2/screenshots/35-mori-v2-6-1-ring-buffer-deny-event-delivery.png}{Phase 04 MORI v2 screenshots, visual page 18 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/36-mori-v2-6-1-final-artifact-hashes.png}{04-custom-mitigation/mori-v2/screenshots/37a-mori-v2-6-2-attacker-facing-judgment-cat.png}{Phase 04 MORI v2 screenshots, visual page 19 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/37b-mori-v2-6-2-attacker-facing-judgment-cat.png}{04-custom-mitigation/mori-v2/screenshots/38-mori-v2-6-2-final-artifact-hashes.png}{Phase 04 MORI v2 screenshots, visual page 20 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/39-mori-v2-6-2-pre-poc-validation.png}{04-custom-mitigation/mori-v2/screenshots/40-mori-v2-6-2-active-before-real-poc.png}{Phase 04 MORI v2 screenshots, visual page 21 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/41-mori-v2-6-2-real-copy-fail-poc-blocked.png}{04-custom-mitigation/mori-v2/screenshots/42-mori-v2-6-2-post-poc-validation-clean.png}{Phase 04 MORI v2 screenshots, visual page 22 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/43-mori-v2-6-2-c-poc-pre-state.png}{04-custom-mitigation/mori-v2/screenshots/44-mori-v2-6-2-c-poc-denied.png}{Phase 04 MORI v2 screenshots, visual page 23 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/45-mori-v2-6-2-c-poc-post-validation.png}{04-custom-mitigation/mori-v2/screenshots/46-alternate-suid-target-baseline-fusermount3.png}{Phase 04 MORI v2 screenshots, visual page 24 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/47-mori-v2-6-2-suid-target-sweep-denied.png}{04-custom-mitigation/mori-v2/screenshots/48-mori-v2-6-2-post-suid-sweep-integrity-10-of-10.png}{Phase 04 MORI v2 screenshots, visual page 25 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/49-mori-v2-6-2-cross-tgid-isolation-allowed.png}{04-custom-mitigation/mori-v2/screenshots/50-mori-v2-6-2-same-tgid-expiry-bypass-reproduced.png}{Phase 04 MORI v2 screenshots, visual page 26 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/51-mori-v2-7-lifecycle-regression-splice-still-allowed.png}{04-custom-mitigation/mori-v2/screenshots/52-mori-v2-7-expiry-bypass-regression-fixed.png}{Phase 04 MORI v2 screenshots, visual page 27 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/53-mori-v2-7-final-python-poc-denied.png}{04-custom-mitigation/mori-v2/screenshots/54-mori-v2-7-final-python-post-validation.png}{Phase 04 MORI v2 screenshots, visual page 28 of 30.}
+\evidencepair{04-custom-mitigation/mori-v2/screenshots/55-mori-v2-7-final-c-poc-denied-and-post-validation.png}{04-custom-mitigation/mori-v2/screenshots/56-independent-c-poc-provenance.png}{Phase 04 MORI v2 screenshots, visual page 29 of 30.}
+\evidencesingle{04-custom-mitigation/mori-v2/screenshots/57-mori-v2-7-final-artifact-provenance.png}{Phase 04 MORI v2 screenshots, visual page 30 of 30.}
+\clearpage
+
+\subsection{Phase 05: Vendor-Patched Validation}
+\label{app:evidence-phase05}
+
+\begin{evidencebox}
+\textbf{Public path:} \path{evidence/05-vendor-patch-validation/}
+
+\textbf{Manifest:}
+\path{evidence/05-vendor-patch-validation/PUBLIC-SHA256SUMS.txt}
+
+\textbf{Coverage:} five verified text artifacts and 13 verified screenshots
+covering the patched baseline, MORI isolation, kernel package, benign AF\_ALG
+control, Python retest, independent C provenance and retest, and final target
+validation.
+
+\textbf{Boundary:} the pre-patch filename is inaccurate; C hashes come from
+screenshot~10 because the text capture failed; strict isolation-before-C-test
+order is not proven by timestamps alone; the patched Python account differs
+from the vulnerable run; and the interactive retests have no matching raw
+execution transcripts. The benign control proves socket creation, bind, and
+accept availability, not encryption or decryption. The independent C path has
+no preserved successful unmitigated vulnerable-side run, and the final target
+check establishes state at capture time rather than continuous integrity.
+\end{evidencebox}
+
+\evidencepair{05-vendor-patch-validation/screenshots/00-vendor-patch-baseline.png}{05-vendor-patch-validation/screenshots/01-vendor-patch-baseline-hash.png}{Phase 05 vendor-patched validation screenshots, visual page 1 of 7.}
+\evidencepair{05-vendor-patch-validation/screenshots/02-mori-enforcement-isolated.png}{05-vendor-patch-validation/screenshots/03-vendor-kernel-package-version.png}{Phase 05 vendor-patched validation screenshots, visual page 2 of 7.}
+\evidencepair{05-vendor-patch-validation/screenshots/04-algif-aead-module-state.png}{05-vendor-patch-validation/screenshots/05-benign-aead-control-pass.png}{Phase 05 vendor-patched validation screenshots, visual page 3 of 7.}
+\evidencepair{05-vendor-patch-validation/screenshots/06-benign-aead-control-hash.png}{05-vendor-patch-validation/screenshots/07-python-poc-provenance-and-denial.png}{Phase 05 vendor-patched validation screenshots, visual page 4 of 7.}
+\evidencepair{05-vendor-patch-validation/screenshots/08-post-python-target-integrity.png}{05-vendor-patch-validation/screenshots/09-pre-c-poc-target-integrity.png}{Phase 05 vendor-patched validation screenshots, visual page 5 of 7.}
+\evidencepair{05-vendor-patch-validation/screenshots/10-independent-c-poc-provenance.png}{05-vendor-patch-validation/screenshots/11-independent-c-poc-denied.png}{Phase 05 vendor-patched validation screenshots, visual page 6 of 7.}
+\evidencesingle{05-vendor-patch-validation/screenshots/12-post-c-poc-integrity-auth-control.png}{Phase 05 vendor-patched validation screenshots, visual page 7 of 7.}
+\clearpage
+
+\subsection{Cross-Chapter Consistency Result}
+\label{app:consistency-result}
+
+The final source was checked across Chapters~1--10 for virtual-machine roles,
+phase numbering, kernel and package versions, user identities, target and
+sample hashes, MORI versions, evidence counts, research-question answers, and
+the Phase~05 caveats. \Cref{tab:cross-chapter-consistency} records the
+authoritative values used after the audit.
+
+\begin{table}[H]
+    \centering
+    \caption{Cross-chapter values fixed by the evidence audit.}
+    \label{tab:cross-chapter-consistency}
+    \small
+    \begin{tabularx}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{0.27\textwidth}Y@{}}
+        \toprule
+        Item & Authoritative report value \\
+        \midrule
+        Reference / experimental VMs & VM~270 \code{copyfail01} is the patched reference; VM~271 \code{copyfail-vuln} is the state-changing target. \\
+        Vulnerable runtime & \code{6.8.0-116-generic}, package \code{6.8.0-116.116}. \\
+        First fixed Noble generic package & \code{6.8.0-117.117}, as identified by Canonical. \\
+        Final patched runtime & \code{6.8.0-137-generic}, package \code{6.8.0-137.137}. \\
+        Test identities & Vulnerable and MORI tests use \code{labuser}, UID~1001; the patched Python screenshot uses \code{researcher}, UID~1000. \\
+        Known-good target digest & {\scriptsize\ttfamily c74311fe5636b7d7f9a56239fa8adeeab12ba86fe7d41b91afa85bf9bbdae78b}. \\
+        Changed mounted-view digest & {\scriptsize\ttfamily 44900c631391f0d60eb6d271b8374a08dc1d9be76e403390d27a91ed5f179be9}. \\
+        Documented Python sample & Phase~02 documentation attributes 731 bytes and SHA-256 {\scriptsize\ttfamily d401e7d1c00605749d6c617ace73ab20a762b72e41c2e1590331596e38219a61} to the sample associated with the UID~0 result, but the vulnerable launch has no immediate pre-launch hash. Phase~05 captures that digest before its patched-side execution. The non-executed trailing-newline variant is 732 bytes. \\
+        Frozen MORI release & v2.7 executable SHA-256 {\scriptsize\ttfamily 7fe7b609b90e164f3ae4a9c025363399a8a63bf2a4338db2ecc62cfd2682d039}. \\
+        MORI v2 inventory & 108 verified objects: 49 implementation/provenance artifacts and 59 screenshots. \\
+        Patched validation inventory & 18 verified objects: five text artifacts and 13 screenshots. \\
+        Outcome boundary & Demonstrated reproduction and tested-path prevention are empirical laboratory results. MORI does not provide universal prevention, and the patched retest is not a population-wide statistical result. The C path is additional patched-side coverage, not a matched vulnerable/patched differential. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The audit does not remove inconvenient records. The missing reproduction and
+detection IDs, stale documentation hashes, v2.6.2 bypass, first v2.7 regression
+failure, later provenance environment, and Phase~05 chronology defects remain
+visible because they determine the strength of the conclusions. The assembled
+package includes a separate claim-to-evidence map and audit README so the same
+decisions can be checked without reverse-engineering them from the prose.

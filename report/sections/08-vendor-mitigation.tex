@@ -1,12 +1,13 @@
 \section{Vendor Mitigation and Comparative Evaluation}
 \label{sec:vendor-mitigation}
+\graphicspath{{../evidence/}{evidence/}}
 
 Chapter~7 showed that a custom compensating control could interrupt the tested
 Copy Fail paths while the vulnerable kernel remained active. It also showed why
 the word \emph{custom} matters. MORI Guard v1 achieved broad prevention by
-removing access to \code{algif\_aead}, whereas MORI v2.7 preserved the tested
-interface operations by enforcing a narrower behavioural correlation. RQ5 now
-places those results beside Canonical's temporary response:
+blocking ordinary loading of \code{algif\_aead}, whereas MORI v2.7 preserved
+the tested interface operations by enforcing a narrower behavioural
+correlation. RQ5 now places those results beside Canonical's temporary response:
 
 \begin{quote}
 \textbf{RQ5 -- Vendor Comparison.} How does the custom compensating control
@@ -30,12 +31,21 @@ so with narrower assurance and substantially greater implementation and
 deployment complexity. Neither custom control corrects the kernel defect, and
 neither should displace the vendor kernel update as the final remediation.
 
+\begin{evidencebox}
+The Phase~01, Phase~04, and Phase~05 public manifests contain 14, 126, and 18
+paths respectively. Every listed object passed an independent
+\code{sha256sum -c} verification before this revision. The causal comparison
+itself rests on the Phase~01 vendor-policy capture and the Phase~04 custom-control
+experiments. Phase~05 is used only to define the transition into the
+corrected-kernel retest.
+\end{evidencebox}
+
 \subsection{Comparison Objective and Evidence Boundary}
 
 The comparison uses three evidence classes. First, Canonical's security notice
 and technical guidance define the purpose, package version, deployment action,
 compatibility warning, and intended lifetime of the temporary mitigation
-\cite{ubuntu-copyfail-fixes,ubuntu-copyfail-cve}. Second, Phase~01 records the
+\cite{ubuntu-copyfail-cve,ubuntu-copyfail-fixes}. Second, Phase~01 records the
 policy as it appeared on the preserved Ubuntu reference guest. Third, Phase~04
 contains the direct vulnerable-kernel experiments for MORI Guard v1 and MORI
 v2.7.
@@ -108,11 +118,12 @@ compatible or that every Copy Fail implementation is recognised.
 
 \subsection{Canonical's Temporary \texttt{kmod} Mitigation}
 
-Canonical published \code{kmod} updates on 30 April 2026 to block loading of
-the affected \code{algif\_aead} module until kernel updates became available.
-For Ubuntu 24.04 LTS Noble, the mitigation-bearing package version was
-\code{31+20240202-2ubuntu7.2} \cite{ubuntu-copyfail-fixes}. Canonical's manual
-equivalent writes the following \code{modprobe} install rule:
+Canonical's guidance of 30 April 2026 documents mitigation-bearing \code{kmod}
+updates that blocked loading of the affected \code{algif\_aead} module while
+fixed kernel packages were being deployed. For Ubuntu 24.04 LTS Noble, the
+mitigation-bearing package version was \code{31+20240202-2ubuntu7.2}
+\cite{ubuntu-copyfail-fixes}. Canonical's manual equivalent writes the following
+\code{modprobe} install rule:
 
 \begin{lstlisting}
 install algif_aead /bin/false
@@ -153,6 +164,30 @@ also recorded \code{CONFIG\_CRYPTO\_USER\_API\_AEAD=m}, so the affected
 interface was a loadable module on this system rather than compiled directly
 into the kernel.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.14\textheight,
+        keepaspectratio
+    ]{01-vulnerability-validation/screenshots/02-patched-kernel-and-kmod.png}
+
+    \vspace{0.65em}
+
+    \includegraphics[
+        width=\textwidth,
+        height=0.17\textheight,
+        keepaspectratio
+    ]{01-vulnerability-validation/screenshots/03-algif-aead-mitigation-active.png}
+    \caption{Phase~01 reference-system captures. The upper image records the
+    already-corrected \code{6.8.0-137-generic} kernel and mitigation-bearing
+    \code{kmod} package. The lower image records the installed
+    \code{algif\_aead} rule and its \code{modprobe} dry-run resolution to
+    \code{/bin/false}. Together they prove policy presence and resolution
+    behaviour, not an isolated vulnerable-kernel exploit result.}
+    \label{fig:phase01-vendor-kmod-reference}
+\end{figure}
+
 This evidence confirms the effective policy and its suitability for the
 captured Ubuntu configuration. It does not establish resistance to an
 administrator deliberately changing the configuration, nor does it test every
@@ -186,19 +221,37 @@ to a laboratory blocker:
 install algif_aead /usr/local/sbin/mori-block-algif-aead
 \end{lstlisting}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.94\textwidth,
+        height=0.25\textheight,
+        keepaspectratio
+    ]{04-custom-mitigation/screenshots/00-mori-guard-configuration.png}
+    \caption{Phase~04 MORI Guard v1 configuration and effective dry run on the
+    vulnerable \code{6.8.0-116-generic} guest. Comparing this capture with
+    \cref{fig:phase01-vendor-kmod-reference} shows the shared module-loading
+    policy class: both replace ordinary \code{algif\_aead} insertion with a
+    failing command, while the custom target adds laboratory-specific
+    presentation and logging.}
+    \label{fig:phase04-v1-guard-config-comparison}
+\end{figure}
+
 The blocker returned failure, wrote a structured journal event, and attempted
 to present the MORI message to the requesting process. On
 \code{6.8.0-116-generic}, the Python proof of concept failed, \code{labuser}
 remained UID~1001, and \code{/usr/bin/su} retained its known-good digest. A
 separate unprivileged \code{gcm(aes)} bind also failed while the guard was
-active.
+active. The complete denial and post-state are preserved in
+\cref{fig:phase04-v1-poc-blocked}.
 
 At the policy level, Canonical's mitigation and MORI Guard v1 are therefore
 equivalent in breadth for the tested Ubuntu module configuration: both replace
 ordinary loading of \code{algif\_aead} with a failing command. The custom script
 changes the presentation and evidence available to the laboratory, not the
-fundamental compatibility boundary. Both deny malicious and benign callers
-before either can use the module.
+fundamental compatibility boundary. While the module is absent, both deny
+ordinary load attempts from malicious and benign callers before either can use
+it.
 
 There are nevertheless operational differences:
 
@@ -250,6 +303,12 @@ This design produced two useful differences from the module-level controls:
     timestamp, and deny type. The telemetry exposed why the policy intervened
     rather than only reporting that module insertion failed.
 \end{enumerate}
+
+Those two differences are directly visible in the preceding chapter's Phase~04
+captures: \cref{fig:phase04-v22-benign-bind} records the retained unprivileged
+bind, while \cref{fig:phase04-v27-python-denied,fig:phase04-v27-c-denied}
+record the final Python and independent C denials with their associated
+telemetry and post-test state.
 
 The selectivity is real within the preserved test matrix, but it changes the
 assurance model. Canonical's mitigation prevents the complete module-dependent
@@ -354,12 +413,11 @@ representative application workload.
 The result is a bounded compatibility ordering:
 
 \begin{lstlisting}
-Canonical kmod mitigation / MORI Guard v1
+Canonical kmod mitigation / MORI Guard v1:
     tested interface removed through normal module resolution
-
-MORI v2.7
-    tested socket, bind, and accept operations retained
-    complete application compatibility not established
+MORI v2.7:
+    socket, bind, and accept retained; complete application
+    compatibility not established
 \end{lstlisting}
 
 Operational characteristics are compared in
@@ -471,18 +529,18 @@ compared.
 MORI Guard v1 is functionally similar to Canonical's mitigation for the tested
 Ubuntu module configuration. Both prevent normal loading of
 \code{algif\_aead}, interrupt the known module-dependent exploitation path, and
-remove benign access to the same interface. MORI Guard v1 adds laboratory
-journalling and presentation, but it is locally maintained and provides no
-compatibility advantage. Canonical's packaged rule is therefore the stronger
-operational choice for broad temporary containment.
+block the same ordinary loading path for benign callers. MORI Guard v1 adds
+laboratory journalling and presentation, but it is locally maintained and
+provides no compatibility advantage. Canonical's packaged rule is therefore the
+stronger operational choice for broad temporary containment.
 
 MORI v2.7 offers a different trade-off. It preserved the tested AF\_ALG AEAD
 socket, bind, and accept operations and denied the correlated Python and
 independent C proof-of-concept paths in the pre-remediation Phase~04 sequence.
-It also supplied structured decision telemetry. Those advantages are balanced by a narrower
-behavioural coverage claim, more complex privileged deployment, kernel-feature
-dependencies, possible false positives for a benign matching sequence, and
-explicit evasion and fail-open boundaries.
+It also supplied structured decision telemetry. Those advantages are balanced
+by a narrower behavioural coverage claim, more complex privileged deployment,
+kernel-feature dependencies, possible false positives for a benign matching
+sequence, and explicit evasion and fail-open boundaries.
 
 The supported conclusion is therefore:
 

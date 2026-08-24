@@ -1,6 +1,8 @@
 \section{Custom Compensating Control: MORI}
 \label{sec:compensating-control}
 
+\graphicspath{{../evidence/}{evidence/}}
+
 Chapter~6 demonstrated that the integrity monitor could recognise a changed
 privileged target without identifying the proof-of-concept sample. That result
 provided visibility, but it occurred after the protected file view had already
@@ -40,6 +42,16 @@ baseline, incremental v2 development, final enforcement architecture,
 lifecycle regression, compatibility controls, adversarial validation, and
 remaining limitations. It concludes by answering RQ4 and establishing the
 boundary for the vendor comparison in Chapter~8.
+
+\begin{evidencebox}
+Phase~04 is preserved under \path{evidence/04-custom-mitigation/}. Its 126
+verified public objects include the broad v1 control, all historical MORI v2
+checkpoints, the frozen v2.7 source and build, and 67 screenshots. The outer
+\path{PUBLIC-SHA256SUMS.txt} contains 126 entries, while the nested MORI v2
+manifest contains 108. Both manifests verify without an error. The outer
+manifest and the current Phase~04 \path{README.md} define the package used in
+this chapter.
+\end{evidencebox}
 
 \subsection{Control Objective, Success Criteria, and Evidence Boundary}
 
@@ -144,6 +156,20 @@ the separate vendor-remediation validation. This distinction prevents the
 later provenance environment from being substituted for the actual test
 sequence.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.24\textheight,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/57-mori-v2-7-final-artifact-provenance.png}
+    \caption{Later provenance capture for the transferred frozen v2.7 set.
+    It verifies the executable and artifact manifest on
+    \code{6.8.0-137-generic}; it is provenance evidence, not a replacement for
+    the earlier mitigation-test chronology.}
+    \label{fig:phase04-v27-artifact-provenance}
+\end{figure}
+
 The evidence supports conclusions about the two tested proof-of-concept
 implementations and the stated regression controls. It does not establish a
 population-wide prevention rate, production compatibility, or protection
@@ -181,6 +207,20 @@ while the integrity-monitor query returned no event because the protected
 target did not change. Within the normal module-loading path exercised by the
 test, v1 therefore interrupted the known exploit prerequisite before the
 privilege boundary was crossed.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.27\textheight,
+        keepaspectratio
+    ]{04-custom-mitigation/screenshots/04-copyfail-blocked-by-mori-guard.png}
+    \caption{Final MORI Guard v1 retest. The Python proof of concept stops at
+    the unavailable AF\_ALG AEAD path, after which the same terminal records
+    UID~1001, the known-good \code{/usr/bin/su} digest, and the still-blocked
+    \code{algif\_aead} module.}
+    \label{fig:phase04-v1-poc-blocked}
+\end{figure}
 
 The same mechanism also exposed its compatibility cost. A separate unprivileged
 control attempted to bind an AF\_ALG AEAD socket to \code{gcm(aes)}. With v1
@@ -330,13 +370,37 @@ shape was visible did v2.6 change the LSM return value to \code{-EPERM}.
 Consequently, active denial was based on a previously observed correlation
 rather than introduced at the same time as the first multi-hook test.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.96\textwidth,
+        trim=0bp 335bp 260bp 0bp,
+        clip,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/29-mori-v2-5-shadow-policy-would-deny.png}
+
+    \smallskip
+
+    \includegraphics[
+        width=0.76\textwidth,
+        trim=615bp 2bp 0bp 300bp,
+        clip,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/29-mori-v2-5-shadow-policy-would-deny.png}
+    \captionsetup{justification=raggedright,singlelinecheck=false}
+    \caption{MORI v2.5 shadow-policy test. The kernel-side trace reaches
+    \code{WOULD-DENY-AEAD-SPLICE-SUID}, while userspace still records a
+    successful AEAD bind and splice because enforcement was not yet active.}
+    \label{fig:phase04-v25-shadow-policy}
+\end{figure}
+
 \subsection{MORI v2.7 Enforcement Architecture}
 
 The frozen v2.7 candidate consists of a userspace loader and a CO-RE BPF object.
 The loader opens and loads the object, authenticates the optional MORI Monitor
 exemption, attaches the BPF programs, and polls a ring buffer for deny events.
-The kernel-side programs make the enforcement decision. The four principal
-state maps are shown in \cref{tab:mori-v27-state}.
+The kernel-side programs make the enforcement decision. The principal state
+maps and event channel are shown in \cref{tab:mori-v27-state}.
 
 \begin{table}[H]
     \centering
@@ -474,6 +538,21 @@ AEAD armed; waiting 12 seconds...
 splice allowed after expiry: 32 bytes
 \end{lstlisting}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.82\textwidth,
+        trim=864bp 3bp 0bp 207bp,
+        clip,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/50-mori-v2-6-2-same-tgid-expiry-bypass-reproduced.png}
+    \captionsetup{justification=raggedright,singlelinecheck=false}
+    \caption{Retained v2.6.2 regression capture. The same TGID keeps the AEAD
+    socket open, waits 12~seconds, and then moves 32~bytes from the SUID target
+    because the timed state has expired.}
+    \label{fig:phase04-v262-expiry-bypass}
+\end{figure}
+
 This was a reproduced bypass of the selected v2.6.2 policy. It was not a
 separate demonstration of UID~0 or target corruption, but it proved that the
 timer could expire while the relevant socket and process remained active. The
@@ -513,6 +592,21 @@ AEAD socket active; waiting 12 seconds...
 splice blocked: errno=1 (Operation not permitted)
 \end{lstlisting}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.72\textwidth,
+        trim=864bp 4.5bp 0bp 255bp,
+        clip,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/52-mori-v2-7-expiry-bypass-regression-fixed.png}
+    \captionsetup{justification=raggedright,singlelinecheck=false}
+    \caption{The same delayed sequence against MORI v2.7. The trace reaches
+    \code{DENY-AEAD-SPLICE-SUID}, userspace receives \code{EPERM}, and the
+    optional terminal message is delivered.}
+    \label{fig:phase04-v27-expiry-fixed}
+\end{figure}
+
 The result addresses the specific expiry defect because the same delayed
 sequence changed from allowed to denied after lifecycle state replaced the
 timer. It does not prove that every socket-transfer, fork, exec, concurrency,
@@ -534,8 +628,9 @@ The final validation used the v2.7 executable whose digest begins
 \code{7fe7b609}. The capture shows the userspace loader verifying the MORI
 Monitor file, trusting TGID~702, attaching the enforcement engine, and
 announcing that selective policy and structured telemetry were active. The
-same executable remained running for the final Python and independent C tests;
-the Phase~04 index records that it was not rebuilt between them.
+Phase~04 index records that the candidate was not rebuilt between the final
+Python and independent C tests. The combined validation capture separately
+shows one loader session receiving the deny events from both executions.
 
 \subsubsection{Python proof of concept}
 
@@ -576,6 +671,35 @@ The target therefore did not enter the changed mounted-view state used by MORI
 Monitor in Chapter~6, and the test did not produce the UID~0 outcome seen during
 the unmitigated reproduction.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=\textwidth,
+        height=0.25\textheight,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/53-mori-v2-7-final-python-poc-denied.png}
+    \caption{Final Python proof-of-concept validation with the frozen v2.7
+    executable. The capture records the executable digest, matching kernel and
+    userspace deny events, and the unprivileged process receiving
+    \code{PermissionError} with \code{errno=1}.}
+    \label{fig:phase04-v27-python-denied}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.92\textwidth,
+        trim=864bp 338bp 0bp 207bp,
+        clip,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/54-mori-v2-7-final-python-post-validation.png}
+    \caption{Highlighted post-test pane from the unmodified final Python
+    validation screenshot. It records UID~1001 and the known-good
+    \code{/usr/bin/su} digest after the denial; the complete capture remains in
+    the Phase~04 evidence tree.}
+    \label{fig:phase04-v27-python-post-state}
+\end{figure}
+
 \subsubsection{Independent C proof of concept}
 
 The second validation used a separately implemented C proof of concept. Its
@@ -587,6 +711,19 @@ source  e1dec1348c0d43ab47d8f992d9a0336216fd37ff83e6fa1d9e39a80890fbd165
 binary  3b2605dc5e820f40645f682385194469f9189cbb65ee99153b52aedf45be5706
 \end{lstlisting}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.82\textwidth,
+        height=0.30\textheight,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/56-independent-c-poc-provenance.png}
+    \caption{Successful provenance capture for the independent C test. It
+    records the repository commit, source digest, and executable digest used in
+    the validation.}
+    \label{fig:phase04-independent-c-provenance}
+\end{figure}
+
 Some provenance commands at the top of the combined validation capture were
 run from the wrong directory and failed. They are not used for these values;
 the separate provenance capture records the successful commit and hash output.
@@ -596,6 +733,34 @@ showed \code{AEAD-ACTIVE}, an observed accept, \code{SPLICE-ARM}, the v2.7
 deny event, splice disarm with return value~$-1$, and AEAD release. After the
 test, the account remained UID~1001 and \code{/usr/bin/su} retained the same
 known-good digest. No privileged shell was observed.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}[t]{0.58\textwidth}
+        \centering
+        \includegraphics[
+            width=\linewidth,
+            trim=864bp 112bp 0bp 270bp,
+            clip,
+            keepaspectratio
+        ]{04-custom-mitigation/mori-v2/screenshots/55-mori-v2-7-final-c-poc-denied-and-post-validation.png}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.38\textwidth}
+        \centering
+        \includegraphics[
+            width=\linewidth,
+            trim=864bp 3.6bp 0bp 465bp,
+            clip,
+            keepaspectratio
+        ]{04-custom-mitigation/mori-v2/screenshots/55-mori-v2-7-final-c-poc-denied-and-post-validation.png}
+    \end{minipage}
+    \captionsetup{justification=raggedright,singlelinecheck=false}
+    \caption{Final independent C proof-of-concept validation. The lower-right
+    session is shown in two highlighted panes: the first write fails, then the
+    post-test check records UID~1001 and the unchanged target digest. The
+    complete unmodified capture remains in the Phase~04 evidence tree.}
+    \label{fig:phase04-v27-c-denied}
+\end{figure}
 
 \begin{table}[H]
     \centering
@@ -633,6 +798,22 @@ denial alone. The most important contrast is between v1 and v2: v1 made even a
 benign \code{gcm(aes)} bind unavailable, whereas the v2 series kept
 \code{algif\_aead} loaded and allowed the tested benign AEAD operation before
 selectively denying the correlated SUID splice.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[
+        width=0.82\textwidth,
+        height=0.27\textheight,
+        trim=768bp 0bp 0bp 0bp,
+        clip,
+        keepaspectratio
+    ]{04-custom-mitigation/mori-v2/screenshots/16-mori-v2-2-benign-aead-bind-preserved.png}
+    \caption{Highlighted right-hand pane of the unmodified v2.2 compatibility
+    screenshot. The unprivileged control records \code{uid=1001} and
+    \code{bind=success}; the complete capture also preserves the adjacent MORI
+    observer output.}
+    \label{fig:phase04-v22-benign-bind}
+\end{figure}
 
 The preserved controls are summarised in
 \cref{tab:mori-compatibility-controls}. Version labels are retained because not

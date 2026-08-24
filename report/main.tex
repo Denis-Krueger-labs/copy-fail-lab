@@ -1,44 +1,34 @@
 \documentclass[11pt,a4paper]{article}
-
 % ============================================================
 % COPY FAIL  TECHNICAL SECURITY RESEARCH REPORT
 % CVE-2026-31431
 % ============================================================
-
 % ------------------------------------------------------------
 % Encoding & language
 % ------------------------------------------------------------
-
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
-
 % ------------------------------------------------------------
 % Typography
 % ------------------------------------------------------------
-
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage{tocloft}
 \usepackage{parskip}
 \usepackage[scaled=0.94]{helvet}
-
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.7em}
 \raggedbottom
-
 % Keep awkward page breaks out of the final report where possible.
 \clubpenalty=10000
 \widowpenalty=10000
 \displaywidowpenalty=10000
 \emergencystretch=2em
-
 \newcommand{\displayfont}{\sffamily}
-
 % ------------------------------------------------------------
 % Page layout
 % ------------------------------------------------------------
-
 \usepackage[
     a4paper,
     top=2.5cm,
@@ -46,35 +36,27 @@
     left=2.7cm,
     right=2.7cm
 ]{geometry}
-
 % ------------------------------------------------------------
 % Colour palette
 % ------------------------------------------------------------
-
 \usepackage[table]{xcolor}
-
 \definecolor{MoriPurple}{HTML}{9D4DFF}
 \definecolor{MoriDeepPurple}{HTML}{6D2CC4}
 \definecolor{MoriLavender}{HTML}{C9C2D6}
 \definecolor{MoriMist}{HTML}{F4F0FF}
 \definecolor{MoriGray}{HTML}{9E9E9E}
 \definecolor{MoriInk}{HTML}{18171C}
-
 \definecolor{MoriPaper}{HTML}{FFFFFF}
 \definecolor{MoriNight}{HTML}{100F14}
 \definecolor{MoriPanel}{HTML}{24212B}
 \definecolor{MoriCode}{HTML}{F6F4F8}
 \definecolor{MoriRule}{HTML}{DCD6E4}
 \definecolor{MoriMuted}{HTML}{68636F}
-
 \color{MoriInk}
-
 % ------------------------------------------------------------
 % Section styling
 % ------------------------------------------------------------
-
 \usepackage{titlesec}
-
 \titleformat{\section}
     {\displayfont\Large\bfseries\color{MoriInk}}
     {\colorbox{MoriPurple}{%
@@ -86,34 +68,28 @@
         \vspace{0.3em}
         \color{MoriRule}\titlerule
     ]
-
 \titleformat{\subsection}
     {\displayfont\large\bfseries\color{MoriInk}}
     {\color{MoriPurple}\thesubsection}
     {0.75em}
     {}
-
 \titleformat{\subsubsection}
     {\displayfont\normalsize\bfseries\color{MoriInk}}
     {\color{MoriPurple}\thesubsubsection}
     {0.75em}
     {}
-
 \titlespacing*{\section}
     {0pt}
     {2.6em}
     {1em}
-
 \titlespacing*{\subsection}
     {0pt}
     {1.8em}
     {0.6em}
-
 \titlespacing*{\subsubsection}
     {0pt}
     {1.4em}
     {0.4em}
-
 % Unnumbered headings (Abstract, Contents, etc.) keep the same visual voice
 % without rendering an empty number tile.
 \titleformat{name=\section,numberless}
@@ -125,58 +101,44 @@
         \vspace{0.3em}
         \color{MoriRule}\titlerule
     ]
-
 % ------------------------------------------------------------
 % Header & footer
 % ------------------------------------------------------------
-
 \usepackage{fancyhdr}
-
-\setlength{\headheight}{22pt}
+\setlength{\headheight}{24pt}
 \setlength{\headsep}{0.55cm}
-
 \pagestyle{fancy}
 \fancyhf{}
-
 \fancyhead[L]{
     \displayfont\footnotesize\bfseries
     \textcolor{MoriPurple}{COPY FAIL}
     \textcolor{MoriGray}{\enspace//\enspace}
     \textcolor{MoriMuted}{CVE-2026-31431}
 }
-
 \fancyhead[R]{
     \displayfont\footnotesize\color{MoriMuted}
     \nouppercase{\rightmark}
 }
-
 \fancyfoot[L]{
     \displayfont\scriptsize\color{MoriGray}
     CONTROLLED SECURITY RESEARCH
 }
-
 \fancyfoot[R]{
     \displayfont\footnotesize\bfseries\color{MoriMuted}
     \thepage
 }
-
 \renewcommand{\sectionmark}[1]{\markright{#1}}
-
 \renewcommand{\headrulewidth}{0.45pt}
-
 \renewcommand{\headrule}{
     \hbox to\headwidth{
         \color{MoriRule}
         \leaders\hrule height \headrulewidth\hfill
     }
 }
-
 \renewcommand{\footrulewidth}{0pt}
-
 % ------------------------------------------------------------
 % Figures & tables
 % ------------------------------------------------------------
-
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{caption}
@@ -184,21 +146,16 @@
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{tikz}
-
 \captionsetup{
     font=small,
     labelfont={bf,color=MoriPurple},
     textfont={color=MoriInk}
 }
-
 \renewcommand{\arraystretch}{1.15}
-
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
-
 % ------------------------------------------------------------
 % Table of contents
 % ------------------------------------------------------------
-
 \renewcommand{\cfttoctitlefont}{%
     \displayfont\Huge\bfseries\color{MoriInk}%
 }
@@ -214,31 +171,24 @@
 \renewcommand{\cftdotsep}{1.5}
 \setlength{\cftbeforesecskip}{0.35em}
 \setlength{\cftbeforesubsecskip}{0.08em}
-
 % ------------------------------------------------------------
 % Lists
 % ------------------------------------------------------------
-
 \usepackage{enumitem}
-
 \setlist[itemize]{
     topsep=0.4em,
     itemsep=0.2em,
     parsep=0pt
 }
-
 \setlist[enumerate]{
     topsep=0.4em,
     itemsep=0.2em,
     parsep=0pt
 }
-
 % ------------------------------------------------------------
 % Terminal / code blocks
 % ------------------------------------------------------------
-
 \usepackage{listings}
-
 \lstdefinestyle{terminal}{
     backgroundcolor=\color{MoriCode},
     basicstyle=\ttfamily\footnotesize\color{MoriInk},
@@ -259,15 +209,11 @@
     belowskip=1em,
     captionpos=b
 }
-
 \lstset{style=terminal}
-
 % ------------------------------------------------------------
 % Research callout boxes
 % ------------------------------------------------------------
-
 \usepackage[most]{tcolorbox}
-
 \tcbset{
     moribox/.style={
         enhanced,
@@ -286,7 +232,6 @@
         after skip=1em
     }
 }
-
 \newtcolorbox{findingbox}{
     moribox,
     before upper={
@@ -297,7 +242,6 @@
         \normalfont\normalsize\color{MoriInk}
     }
 }
-
 \newtcolorbox{evidencebox}{
     moribox,
     borderline west={2pt}{0pt}{MoriLavender},
@@ -309,7 +253,6 @@
         \normalfont\normalsize\color{MoriInk}
     }
 }
-
 \newtcolorbox{checkpointbox}{
     moribox,
     borderline west={3pt}{0pt}{MoriPurple},
@@ -321,7 +264,6 @@
         \normalfont\normalsize\color{MoriInk}
     }
 }
-
 \newtcolorbox{limitationbox}{
     moribox,
     colback=MoriCode,
@@ -334,27 +276,14 @@
         \normalfont\normalsize\color{MoriInk}
     }
 }
-
 % ------------------------------------------------------------
-% Bibliography
+% References use LaTeX's built-in bibliography so the report remains a
+% single-pass pdflatex project and does not require a separate biber run.
 % ------------------------------------------------------------
-
-\usepackage{csquotes}
-
-\usepackage[
-    backend=biber,
-    style=ieee,
-    sorting=none
-]{biblatex}
-
-\addbibresource{references.bib}
-
 % ------------------------------------------------------------
 % Hyperlinks & references
 % ------------------------------------------------------------
-
 \usepackage{hyperref}
-
 \hypersetup{
     colorlinks=true,
     linkcolor=MoriPurple,
@@ -365,13 +294,10 @@
     pdfsubject={Technical Security Research Report},
     pdfauthor={Denis Krüger}
 }
-
 \usepackage[nameinlink,noabbrev]{cleveref}
-
 % ------------------------------------------------------------
 % Utility commands
 % ------------------------------------------------------------
-
 \newcommand{\code}[1]{
     \begingroup
     \setlength{\fboxsep}{1.7pt}%
@@ -380,50 +306,38 @@
     }%
     \endgroup
 }
-
 \newcommand{\statuspass}{
     \raisebox{0.1ex}{\textcolor{MoriPurple}{\rule{1.05ex}{1.05ex}}}%
     \hspace{0.45em}%
     {\displayfont\footnotesize\bfseries\color{MoriDeepPurple}PASS}
 }
-
 \newcommand{\statusfail}{
     \raisebox{0.1ex}{\textcolor{MoriInk}{\rule{1.05ex}{1.05ex}}}%
     \hspace{0.45em}%
     {\displayfont\footnotesize\bfseries\color{MoriInk}FAIL}
 }
-
 \newcommand{\statuspending}{
     \raisebox{0.1ex}{\textcolor{MoriGray}{\rule{1.05ex}{1.05ex}}}%
     \hspace{0.45em}%
     {\displayfont\footnotesize\bfseries\color{MoriMuted}PENDING}
 }
-
 \newcommand{\coverkey}[1]{%
     {\displayfont\scriptsize\bfseries\color{MoriGray}\MakeUppercase{#1}}%
 }
-
 \newcommand{\covervalue}[1]{%
     {\displayfont\small\bfseries\color{MoriPaper}#1}%
 }
-
 % ============================================================
 % DOCUMENT
 % ============================================================
-
 \begin{document}
-
 % Avoid a duplicate PDF page anchor when numbering restarts after the cover.
 \hypersetup{pageanchor=false}
-
 % ============================================================
 % TITLE PAGE
 % ============================================================
-
 \begin{titlepage}
-
     \thispagestyle{empty}
-
     % Full-bleed cover. The report body remains deliberately light for
     % readability and printing; the dark treatment is isolated to this page.
     \begin{tikzpicture}[remember picture,overlay]
@@ -453,45 +367,37 @@
         ] at ([xshift=-16mm,yshift=10mm]current page.south east)
             {31431};
     \end{tikzpicture}
-
     \color{MoriPaper}
     \vspace*{0.35cm}
-
     {\displayfont\scriptsize\bfseries\color{MoriLavender}
         TECHNICAL SECURITY RESEARCH REPORT
+        \hfill
+        {\ttfamily\small\bfseries\color{MoriPurple}CVE-2026-31431}
+        \par
     }
-    \hfill
-    {\ttfamily\small\bfseries\color{MoriPurple}
-        CVE-2026-31431
-    }
-
-    \vspace{4.25cm}
-
+    \vspace{2.25cm}
     {\displayfont\bfseries\fontsize{54}{52}\selectfont
-        COPY
+        COPY\\[-0.03em]
         \textcolor{MoriPurple}{FAIL}
+        \par
     }
-
     \vspace{0.75cm}
-
     {\displayfont\LARGE\color{MoriPaper}
         A Controlled Reproduction, Detection,\\[0.15em]
         and Mitigation of a Linux Kernel\\[0.15em]
         Local Privilege Escalation
+        \par
     }
-
     \vspace{0.75cm}
-
     {\displayfont\scriptsize\bfseries\color{MoriGray}
         LINUX KERNEL\enspace
         \textcolor{MoriPurple}{//}\enspace
         LOCAL PRIVILEGE ESCALATION\enspace
         \textcolor{MoriPurple}{//}\enspace
         CONTROLLED LAB
+        \par
     }
-
     \vfill
-
     \begin{tcolorbox}[
         enhanced,
         sharp corners,
@@ -514,7 +420,6 @@
             \coverkey{Severity}\par
             \covervalue{High / CVSS 7.8}
             \\[1.15em]
-
             \coverkey{Environment}\par
             \covervalue{Isolated Proxmox Lab}
             &
@@ -525,35 +430,25 @@
             \covervalue{\today}
         \end{tabularx}
     \end{tcolorbox}
-
     \vspace{0.55cm}
-
     {\displayfont\scriptsize\color{MoriGray}
         Security research laboratory project
         \hfill
         controlled environment / documented evidence
     }
-
     \vspace{0.45cm}
-
 \end{titlepage}
-
 \color{MoriInk}
 \hypersetup{pageanchor=true}
-
 % ============================================================
 % FRONT MATTER
 % ============================================================
-
 \pagenumbering{roman}
-
 % ------------------------------------------------------------
 % Abstract
 % ------------------------------------------------------------
-
 \section*{Abstract}
 \addcontentsline{toc}{section}{Abstract}
-
 \begin{tcolorbox}[
     enhanced,
     breakable,
@@ -569,210 +464,93 @@
 This report documents the controlled analysis, reproduction, detection,
 mitigation, and retesting of CVE-2026-31431, commonly referred to as
 \emph{Copy Fail}.
-
+\par\medskip
 The research is conducted within an isolated laboratory environment and
 focuses not only on demonstrating the vulnerability, but on understanding
 the affected Linux kernel functionality, identifying observable behaviour,
 developing a custom detection strategy, evaluating a compensating control,
 and comparing those results with vendor-provided mitigations and patches.
-
+\par\medskip
 Evidence is collected throughout the experiment and preserved separately
 from the analytical report. Raw evidence is retained privately, while
 sanitized artifacts intended for public release receive their own integrity
 verification before being added to the repository.
 \end{tcolorbox}
-
 \clearpage
-
 % ------------------------------------------------------------
 % Table of contents
 % ------------------------------------------------------------
-
 \markboth{Contents}{}
 \tableofcontents
-
 \clearpage
-
 % ============================================================
 % MAIN REPORT
 % ============================================================
-
 \pagenumbering{arabic}
-
 \input{sections/01-research}
-
+\clearpage
 \input{sections/02-lab-setup}
-
+\clearpage
 \input{sections/03-clean-baseline}
-
+\clearpage
 \input{sections/04-vulnerability-analysis}
-
+\clearpage
 \input{sections/05-reproduction}
-
+\clearpage
 \input{sections/06-detection}
-
+\clearpage
 \input{sections/07-compensating-control}
-
+\clearpage
 \input{sections/08-vendor-mitigation}
-
+\clearpage
 \input{sections/09-retest}
-
+\clearpage
 \input{sections/10-lessons-learned}
-
 % ============================================================
 % REFERENCES
 % ============================================================
-
 \clearpage
-
 \markright{References}
-\printbibliography[
-    heading=bibintoc,
-    title={References}
-]
-
+\addcontentsline{toc}{section}{References}
+\begin{thebibliography}{9}
+\bibitem{ubuntu-copyfail-cve}
+Canonical,
+``CVE-2026-31431,'' 2026.
+\url{https://ubuntu.com/security/CVE-2026-31431}.
+Accessed 8 August 2026.
+\bibitem{ubuntu-copyfail-fixes}
+L. Stanescu,
+``Fixes available for CVE-2026-31431 (Copy Fail) Linux Kernel Local Privilege
+Escalation Vulnerability,'' Canonical, 30 April 2026.
+\url{https://ubuntu.com/blog/copy-fail-vulnerability-fixes-available}.
+Accessed 8 August 2026.
+\bibitem{cve-copyfail}
+Linux Kernel CNA,
+``CVE-2026-31431: crypto: algif\_aead -- Revert to operating out-of-place,''
+2026.
+\url{https://www.cve.org/CVERecord?id=CVE-2026-31431}.
+Accessed 8 August 2026.
+\bibitem{linux-copyfail-fix}
+H. Xu,
+``crypto: algif\_aead -- Revert to operating out-of-place,'' 2026,
+upstream commit \code{a664bf3d603dc3bdcf9ae47cc21e0daec706d7a5}.
+\url{https://www.spinics.net/lists/stable/msg939222.html}.
+Accessed 8 August 2026.
+\bibitem{copyfail-research}
+J. Im,
+\emph{Copy Fail: 732 Bytes to Root on Every Major Linux Distribution}, Xint,
+29 April 2026.
+\url{https://xint.io/blog/copy-fail-linux-distributions}.
+Accessed 23 August 2026.
+\end{thebibliography}
 % ============================================================
 % APPENDICES
 % ============================================================
-
 \clearpage
-
 \appendix
-
 % ------------------------------------------------------------
-% Evidence overview
-% ------------------------------------------------------------
-
-\section{Evidence Overview}
-
-Experimental evidence is maintained separately from the analytical report
-under the repository's \code{evidence/} directory.
-
-Each experimental phase receives its own evidence directory containing the
-relevant command output, screenshots, integrity manifests, and other
-supporting artifacts.
-
-The report and evidence therefore serve different purposes:
-
-\begin{itemize}
-
-    \item
-    the report explains the methodology, observations, interpretation, and
-    conclusions;
-
-    \item
-    the evidence directories preserve the artifacts supporting those
-    conclusions.
-
-\end{itemize}
-
-Where sanitization is required for public release, the original artifact is
-preserved privately before modification.
-
-The public workflow is:
-
-\begin{lstlisting}
-raw evidence
-    |
-    v
-private integrity verification
-    |
-    v
-preserved private copy
-    |
-    v
-sanitized public artifact
-    |
-    v
-public integrity verification
-    |
-    v
-Git repository
-\end{lstlisting}
-
-This prevents sanitized repository artifacts from being mistaken for the
-original raw evidence while still providing integrity verification for the
-public dataset.
-
-% ------------------------------------------------------------
-% Experimental status
-% ------------------------------------------------------------
-
-\section{Experimental Status}
-
-At the current stage of the project, the following phases are planned:
-
-\begin{table}[H]
-    \centering
-
-    \begin{tabularx}{0.82\textwidth}{
-        @{}
-        Y
-        >{\raggedleft\arraybackslash}p{3.1cm}
-        @{}
-    }
-
-        \toprule
-
-        \displayfont\bfseries\textcolor{MoriInk}{Phase}
-        &
-        \displayfont\bfseries\textcolor{MoriInk}{Status}
-        \\
-
-        \midrule
-
-        Initial research
-        &
-        \statuspass
-        \\
-
-        Laboratory setup
-        &
-        \statuspass
-        \\
-
-        Clean baseline
-        &
-        \statuspass
-        \\
-
-        Vulnerability validation
-        &
-        \statuspass
-        \\
-
-        Controlled reproduction
-        &
-        \statuspass
-        \\
-
-        Detection engineering
-        &
-        \statuspass
-        \\
-
-        Custom compensating control
-        &
-        \statuspass
-        \\
-
-        Vendor mitigation comparison
-        &
-        \statuspass
-        \\
-
-        Final retest
-        &
-        \statuspass
-        \\
-
-        \bottomrule
-
-    \end{tabularx}
-
-    \caption{Current experimental project status.}
-    \label{tab:experimental-status}
-
-\end{table}
-
+% Appendix A is maintained as a separate, versioned source file so that the
+% evidence catalogue can be revised without rewriting the report preamble or
+% analytical chapters.
+\input{sections/AppendixA}
 \end{document}
