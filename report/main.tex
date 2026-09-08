@@ -1,17 +1,49 @@
-\documentclass[11pt,a4paper]{article}
+\documentclass[11pt]{article}
+
 % ============================================================
-% COPY FAIL  TECHNICAL SECURITY RESEARCH REPORT
+% COPY FAIL -- TECHNICAL SECURITY RESEARCH REPORT
 % CVE-2026-31431
+%
+% OUTPUT MODE
+%   \PrintWrapfalse -> complete A4 report with front and back cover
+%   \PrintWraptrue  -> one-page print wrap: back | spine | front
 % ============================================================
+
+\newif\ifPrintWrap
+\PrintWrapfalse
+
+% The report contains 146 interior pages (73 sheets). Keep this value at
+% 8 mm only as a layout preview; replace it with the exact spine width
+% supplied by the printer for the selected paper before final production.
+\newlength{\SpineWidth}
+\setlength{\SpineWidth}{8mm}
+\newlength{\CoverBleed}
+\setlength{\CoverBleed}{3mm}
+\newlength{\TrimWidth}
+\setlength{\TrimWidth}{210mm}
+\newlength{\TrimHeight}
+\setlength{\TrimHeight}{297mm}
+\newlength{\WrapWidth}
+\setlength{\WrapWidth}{\dimexpr 2\TrimWidth+\SpineWidth+2\CoverBleed\relax}
+\newlength{\WrapHeight}
+\setlength{\WrapHeight}{\dimexpr \TrimHeight+2\CoverBleed\relax}
+
+% Frozen project metadata. Never replace \ReportDate with \today.
+\newcommand{\ReportDate}{September 8, 2026}
+\newcommand{\ReportDateISO}{2026.09.08}
+
 % ------------------------------------------------------------
-% Encoding & language
+% Encoding and language
 % ------------------------------------------------------------
+
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage[english]{babel}
+
 % ------------------------------------------------------------
 % Typography
 % ------------------------------------------------------------
+
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage{tocloft}
@@ -20,27 +52,40 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.7em}
 \raggedbottom
-% Keep awkward page breaks out of the final report where possible.
 \clubpenalty=10000
 \widowpenalty=10000
 \displaywidowpenalty=10000
 \emergencystretch=2em
+
 \newcommand{\displayfont}{\sffamily}
+
 % ------------------------------------------------------------
 % Page layout
 % ------------------------------------------------------------
-\usepackage[
+
+\ifPrintWrap
+  \usepackage[
+    paperwidth=\WrapWidth,
+    paperheight=\WrapHeight,
+    margin=0pt
+  ]{geometry}
+\else
+  \usepackage[
     a4paper,
     top=2.5cm,
     bottom=2.6cm,
     left=2.7cm,
     right=2.7cm
-]{geometry}
+  ]{geometry}
+\fi
+
 % ------------------------------------------------------------
 % Colour palette
 % ------------------------------------------------------------
+
 \usepackage[table]{xcolor}
 \definecolor{MoriPurple}{HTML}{9D4DFF}
+\definecolor{MoriElectric}{HTML}{7C20FF}
 \definecolor{MoriDeepPurple}{HTML}{6D2CC4}
 \definecolor{MoriLavender}{HTML}{C9C2D6}
 \definecolor{MoriMist}{HTML}{F4F0FF}
@@ -48,97 +93,17 @@
 \definecolor{MoriInk}{HTML}{18171C}
 \definecolor{MoriPaper}{HTML}{FFFFFF}
 \definecolor{MoriNight}{HTML}{100F14}
+\definecolor{MoriNightSoft}{HTML}{15131B}
 \definecolor{MoriPanel}{HTML}{24212B}
 \definecolor{MoriCode}{HTML}{F6F4F8}
 \definecolor{MoriRule}{HTML}{DCD6E4}
 \definecolor{MoriMuted}{HTML}{68636F}
 \color{MoriInk}
+
 % ------------------------------------------------------------
-% Section styling
+% Core packages
 % ------------------------------------------------------------
-\usepackage{titlesec}
-\titleformat{\section}
-    {\displayfont\Large\bfseries\color{MoriInk}}
-    {\colorbox{MoriPurple}{%
-        \makebox[2.15em][c]{\color{MoriPaper}\strut\thesection}%
-    }}
-    {0.8em}
-    {}
-    [
-        \vspace{0.3em}
-        \color{MoriRule}\titlerule
-    ]
-\titleformat{\subsection}
-    {\displayfont\large\bfseries\color{MoriInk}}
-    {\color{MoriPurple}\thesubsection}
-    {0.75em}
-    {}
-\titleformat{\subsubsection}
-    {\displayfont\normalsize\bfseries\color{MoriInk}}
-    {\color{MoriPurple}\thesubsubsection}
-    {0.75em}
-    {}
-\titlespacing*{\section}
-    {0pt}
-    {2.6em}
-    {1em}
-\titlespacing*{\subsection}
-    {0pt}
-    {1.8em}
-    {0.6em}
-\titlespacing*{\subsubsection}
-    {0pt}
-    {1.4em}
-    {0.4em}
-% Unnumbered headings (Abstract, Contents, etc.) keep the same visual voice
-% without rendering an empty number tile.
-\titleformat{name=\section,numberless}
-    {\displayfont\Large\bfseries\color{MoriInk}}
-    {}
-    {0pt}
-    {}
-    [
-        \vspace{0.3em}
-        \color{MoriRule}\titlerule
-    ]
-% ------------------------------------------------------------
-% Header & footer
-% ------------------------------------------------------------
-\usepackage{fancyhdr}
-\setlength{\headheight}{24pt}
-\setlength{\headsep}{0.55cm}
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{
-    \displayfont\footnotesize\bfseries
-    \textcolor{MoriPurple}{COPY FAIL}
-    \textcolor{MoriGray}{\enspace//\enspace}
-    \textcolor{MoriMuted}{CVE-2026-31431}
-}
-\fancyhead[R]{
-    \displayfont\footnotesize\color{MoriMuted}
-    \nouppercase{\rightmark}
-}
-\fancyfoot[L]{
-    \displayfont\scriptsize\color{MoriGray}
-    CONTROLLED SECURITY RESEARCH
-}
-\fancyfoot[R]{
-    \displayfont\footnotesize\bfseries\color{MoriMuted}
-    \thepage
-}
-\renewcommand{\sectionmark}[1]{\markright{#1}}
-\renewcommand{\headrulewidth}{0.45pt}
-\renewcommand{\headrule}{
-    \hbox to\headwidth{
-        \color{MoriRule}
-        \leaders\hrule height \headrulewidth\hfill
-    }
-}
-\renewcommand{\footrulewidth}{0pt}
-% ------------------------------------------------------------
-% Figures & tables
-% ------------------------------------------------------------
+
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{caption}
@@ -146,23 +111,104 @@
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+
+% ------------------------------------------------------------
+% Section styling
+% ------------------------------------------------------------
+
+\usepackage{titlesec}
+
+\titleformat{\section}
+  {\displayfont\Large\bfseries\color{MoriInk}}
+  {\colorbox{MoriPurple}{%
+    \makebox[2.15em][c]{\color{MoriPaper}\strut\thesection}%
+  }}
+  {0.8em}
+  {}
+  [\vspace{0.3em}\color{MoriRule}\titlerule]
+
+\titleformat{\subsection}
+  {\displayfont\large\bfseries\color{MoriInk}}
+  {\color{MoriPurple}\thesubsection}
+  {0.75em}
+  {}
+
+\titleformat{\subsubsection}
+  {\displayfont\normalsize\bfseries\color{MoriInk}}
+  {\color{MoriPurple}\thesubsubsection}
+  {0.75em}
+  {}
+
+\titlespacing*{\section}{0pt}{2.6em}{1em}
+\titlespacing*{\subsection}{0pt}{1.8em}{0.6em}
+\titlespacing*{\subsubsection}{0pt}{1.4em}{0.4em}
+
+\titleformat{name=\section,numberless}
+  {\displayfont\Large\bfseries\color{MoriInk}}
+  {}
+  {0pt}
+  {}
+  [\vspace{0.3em}\color{MoriRule}\titlerule]
+
+% ------------------------------------------------------------
+% Header and footer
+% ------------------------------------------------------------
+
+\usepackage{fancyhdr}
+\setlength{\headheight}{24pt}
+\setlength{\headsep}{0.55cm}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{%
+  \displayfont\footnotesize\bfseries
+  \textcolor{MoriPurple}{COPY FAIL}
+  \textcolor{MoriGray}{\enspace//\enspace}
+  \textcolor{MoriMuted}{CVE-2026-31431}%
+}
+\fancyhead[R]{%
+  \displayfont\footnotesize\color{MoriMuted}
+  \nouppercase{\rightmark}%
+}
+\fancyfoot[L]{%
+  \displayfont\scriptsize\color{MoriGray}
+  CONTROLLED SECURITY RESEARCH
+}
+\fancyfoot[R]{%
+  \displayfont\footnotesize\bfseries\color{MoriMuted}
+  \thepage
+}
+\renewcommand{\sectionmark}[1]{\markright{#1}}
+\renewcommand{\headrulewidth}{0.45pt}
+\renewcommand{\headrule}{%
+  \hbox to\headwidth{%
+    \color{MoriRule}\leaders\hrule height \headrulewidth\hfill
+  }%
+}
+\renewcommand{\footrulewidth}{0pt}
+
+% ------------------------------------------------------------
+% Figures, tables, and contents
+% ------------------------------------------------------------
+
 \captionsetup{
-    font=small,
-    labelfont={bf,color=MoriPurple},
-    textfont={color=MoriInk}
+  font=small,
+  labelfont={bf,color=MoriPurple},
+  textfont={color=MoriInk}
 }
 \renewcommand{\arraystretch}{1.15}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
-% ------------------------------------------------------------
-% Table of contents
-% ------------------------------------------------------------
+
 \renewcommand{\cfttoctitlefont}{%
-    \displayfont\Huge\bfseries\color{MoriInk}%
+  \displayfont\Huge\bfseries\color{MoriInk}%
 }
 \renewcommand{\cftaftertoctitle}{%
-    \par\vspace{0.15em}%
-    {\color{MoriRule}\hrule height 0.5pt}%
-    \vspace{0.8em}%
+  \par\vspace{0.15em}%
+  {\color{MoriRule}\hrule height 0.5pt}%
+  \vspace{0.8em}%
 }
 \renewcommand{\cftsecfont}{\displayfont\bfseries\color{MoriInk}}
 \renewcommand{\cftsecpagefont}{\displayfont\bfseries\color{MoriPurple}}
@@ -171,285 +217,499 @@
 \renewcommand{\cftdotsep}{1.5}
 \setlength{\cftbeforesecskip}{0.35em}
 \setlength{\cftbeforesubsecskip}{0.08em}
+
 % ------------------------------------------------------------
 % Lists
 % ------------------------------------------------------------
-\usepackage{enumitem}
+
 \setlist[itemize]{
-    topsep=0.4em,
-    itemsep=0.2em,
-    parsep=0pt
+  topsep=0.4em,
+  itemsep=0.2em,
+  parsep=0pt
 }
 \setlist[enumerate]{
-    topsep=0.4em,
-    itemsep=0.2em,
-    parsep=0pt
+  topsep=0.4em,
+  itemsep=0.2em,
+  parsep=0pt
 }
+
 % ------------------------------------------------------------
-% Terminal / code blocks
+% Terminal and code blocks
 % ------------------------------------------------------------
-\usepackage{listings}
+
 \lstdefinestyle{terminal}{
-    backgroundcolor=\color{MoriCode},
-    basicstyle=\ttfamily\footnotesize\color{MoriInk},
-    frame=l,
-    rulecolor=\color{MoriPurple},
-    framerule=2.2pt,
-    framesep=9pt,
-    breaklines=true,
-    breakatwhitespace=false,
-    columns=fullflexible,
-    keepspaces=true,
-    showstringspaces=false,
-    tabsize=4,
-    xleftmargin=0.4em,
-    xrightmargin=0.2em,
-    framexleftmargin=0pt,
-    aboveskip=1em,
-    belowskip=1em,
-    captionpos=b
+  backgroundcolor=\color{MoriCode},
+  basicstyle=\ttfamily\footnotesize\color{MoriInk},
+  frame=l,
+  rulecolor=\color{MoriPurple},
+  framerule=2.2pt,
+  framesep=9pt,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=4,
+  xleftmargin=0.4em,
+  xrightmargin=0.2em,
+  framexleftmargin=0pt,
+  aboveskip=1em,
+  belowskip=1em,
+  captionpos=b
 }
 \lstset{style=terminal}
+
 % ------------------------------------------------------------
 % Research callout boxes
 % ------------------------------------------------------------
-\usepackage[most]{tcolorbox}
+
 \tcbset{
-    moribox/.style={
-        enhanced,
-        breakable,
-        sharp corners,
-        boxrule=0.45pt,
-        colframe=MoriRule,
-        colback=MoriMist,
-        coltext=MoriInk,
-        borderline west={2.6pt}{0pt}{MoriPurple},
-        left=4mm,
-        right=4mm,
-        top=3mm,
-        bottom=3mm,
-        before skip=1em,
-        after skip=1em
-    }
+  moribox/.style={
+    enhanced,
+    breakable,
+    sharp corners,
+    boxrule=0.45pt,
+    colframe=MoriRule,
+    colback=MoriMist,
+    coltext=MoriInk,
+    borderline west={2.6pt}{0pt}{MoriPurple},
+    left=4mm,
+    right=4mm,
+    top=3mm,
+    bottom=3mm,
+    before skip=1em,
+    after skip=1em
+  }
 }
+
 \newtcolorbox{findingbox}{
-    moribox,
-    before upper={
-        \displayfont\scriptsize\bfseries\color{MoriPurple}
-        FINDING\enspace//
-        \par
-        \smallskip
-        \normalfont\normalsize\color{MoriInk}
-    }
+  moribox,
+  before upper={%
+    \displayfont\scriptsize\bfseries\color{MoriPurple}
+    FINDING\enspace//\par\smallskip
+    \normalfont\normalsize\color{MoriInk}%
+  }
 }
+
 \newtcolorbox{evidencebox}{
-    moribox,
-    borderline west={2pt}{0pt}{MoriLavender},
-    before upper={
-        \displayfont\scriptsize\bfseries\color{MoriMuted}
-        EVIDENCE\enspace//
-        \par
-        \smallskip
-        \normalfont\normalsize\color{MoriInk}
-    }
+  moribox,
+  borderline west={2pt}{0pt}{MoriLavender},
+  before upper={%
+    \displayfont\scriptsize\bfseries\color{MoriMuted}
+    EVIDENCE\enspace//\par\smallskip
+    \normalfont\normalsize\color{MoriInk}%
+  }
 }
+
 \newtcolorbox{checkpointbox}{
-    moribox,
-    borderline west={3pt}{0pt}{MoriPurple},
-    before upper={
-        \displayfont\scriptsize\bfseries\color{MoriPurple}
-        CHECKPOINT\enspace//
-        \par
-        \smallskip
-        \normalfont\normalsize\color{MoriInk}
-    }
+  moribox,
+  borderline west={3pt}{0pt}{MoriPurple},
+  before upper={%
+    \displayfont\scriptsize\bfseries\color{MoriPurple}
+    CHECKPOINT\enspace//\par\smallskip
+    \normalfont\normalsize\color{MoriInk}%
+  }
 }
+
 \newtcolorbox{limitationbox}{
-    moribox,
-    colback=MoriCode,
-    borderline west={2pt}{0pt}{MoriGray},
-    before upper={
-        \displayfont\scriptsize\bfseries\color{MoriMuted}
-        LIMITATION\enspace//
-        \par
-        \smallskip
-        \normalfont\normalsize\color{MoriInk}
-    }
+  moribox,
+  colback=MoriCode,
+  borderline west={2pt}{0pt}{MoriGray},
+  before upper={%
+    \displayfont\scriptsize\bfseries\color{MoriMuted}
+    LIMITATION\enspace//\par\smallskip
+    \normalfont\normalsize\color{MoriInk}%
+  }
 }
+
 % ------------------------------------------------------------
-% References use LaTeX's built-in bibliography so the report remains a
-% single-pass pdflatex project and does not require a separate biber run.
+% Hyperlinks and references
 % ------------------------------------------------------------
-% ------------------------------------------------------------
-% Hyperlinks & references
-% ------------------------------------------------------------
+
 \usepackage{hyperref}
 \hypersetup{
-    colorlinks=true,
-    linkcolor=MoriPurple,
-    citecolor=MoriPurple,
-    urlcolor=MoriPurple,
-    pdfborder={0 0 0},
-    pdftitle={Copy Fail - CVE-2026-31431},
-    pdfsubject={Technical Security Research Report},
-    pdfauthor={Denis Krüger}
+  colorlinks=true,
+  linkcolor=MoriPurple,
+  citecolor=MoriPurple,
+  urlcolor=MoriPurple,
+  pdfborder={0 0 0},
+  pdftitle={Copy Fail - CVE-2026-31431},
+  pdfsubject={Technical Security Research Report},
+  pdfauthor={Denis Krüger}
 }
 \usepackage[nameinlink,noabbrev]{cleveref}
+
 % ------------------------------------------------------------
 % Utility commands
 % ------------------------------------------------------------
-\newcommand{\code}[1]{
-    \begingroup
-    \setlength{\fboxsep}{1.7pt}%
-    \colorbox{MoriCode}{%
-        \texttt{\small\color{MoriDeepPurple}\strut #1}%
-    }%
-    \endgroup
+
+\newcommand{\code}[1]{%
+  \begingroup
+  \setlength{\fboxsep}{1.7pt}%
+  \colorbox{MoriCode}{%
+    \texttt{\small\color{MoriDeepPurple}\strut #1}%
+  }%
+  \endgroup
 }
-\newcommand{\statuspass}{
-    \raisebox{0.1ex}{\textcolor{MoriPurple}{\rule{1.05ex}{1.05ex}}}%
-    \hspace{0.45em}%
-    {\displayfont\footnotesize\bfseries\color{MoriDeepPurple}PASS}
+
+\newcommand{\statuspass}{%
+  \raisebox{0.1ex}{\textcolor{MoriPurple}{\rule{1.05ex}{1.05ex}}}%
+  \hspace{0.45em}%
+  {\displayfont\footnotesize\bfseries\color{MoriDeepPurple}PASS}%
 }
-\newcommand{\statusfail}{
-    \raisebox{0.1ex}{\textcolor{MoriInk}{\rule{1.05ex}{1.05ex}}}%
-    \hspace{0.45em}%
-    {\displayfont\footnotesize\bfseries\color{MoriInk}FAIL}
+
+\newcommand{\statusfail}{%
+  \raisebox{0.1ex}{\textcolor{MoriInk}{\rule{1.05ex}{1.05ex}}}%
+  \hspace{0.45em}%
+  {\displayfont\footnotesize\bfseries\color{MoriInk}FAIL}%
 }
-\newcommand{\statuspending}{
-    \raisebox{0.1ex}{\textcolor{MoriGray}{\rule{1.05ex}{1.05ex}}}%
-    \hspace{0.45em}%
-    {\displayfont\footnotesize\bfseries\color{MoriMuted}PENDING}
+
+\newcommand{\statuspending}{%
+  \raisebox{0.1ex}{\textcolor{MoriGray}{\rule{1.05ex}{1.05ex}}}%
+  \hspace{0.45em}%
+  {\displayfont\footnotesize\bfseries\color{MoriMuted}PENDING}%
 }
-\newcommand{\coverkey}[1]{%
-    {\displayfont\scriptsize\bfseries\color{MoriGray}\MakeUppercase{#1}}%
+
+% Keep the project compiling even when the cover asset has not yet been
+% copied into a clean build directory. In the real project this resolves to
+% assets/moth-cover.png.
+\newcommand{\MothGraphic}[1]{%
+  \IfFileExists{assets/moth-cover.png}{%
+    \includegraphics[width=#1]{assets/moth-cover.png}%
+  }{%
+    \PackageWarning{copy-fail}{assets/moth-cover.png not found; cover moth omitted}%
+    \mbox{}%
+  }%
 }
-\newcommand{\covervalue}[1]{%
-    {\displayfont\small\bfseries\color{MoriPaper}#1}%
+
+% ============================================================
+% COVER ART
+% All coordinates below use millimetres inside a 210 x 297 mm panel.
+% ============================================================
+
+\tikzset{
+  cover-small/.style={
+    font=\displayfont\fontsize{7.2}{8.5}\selectfont,
+    text=MoriGray
+  },
+  cover-key/.style={
+    font=\displayfont\bfseries\fontsize{6.8}{8}\selectfont,
+    text=MoriGray
+  },
+  cover-value/.style={
+    font=\displayfont\bfseries\fontsize{8.2}{9.5}\selectfont,
+    text=MoriPaper
+  }
 }
+
+\newcommand{\DrawFrontPanel}{%
+  \fill[MoriNight] (-3,-3) rectangle (213,300);
+
+  % Fine dossier rule and outer-edge accent.
+  \draw[MoriPurple,line width=0.65pt] (18,276) -- (192,276);
+  \fill[MoriPurple] (205,0) rectangle (210,297);
+
+  % Front cover: place the moth body at the binding edge (left), allowing
+  % the wing to open outward across the front instead of being cut at trim.
+  \node[anchor=north west,inner sep=0pt,opacity=0.50]
+    at (-250,197) {\MothGraphic{500mm}};
+
+  % Ghosted CVE number.
+  \node[
+    anchor=south east,
+    inner sep=0pt,
+    text=MoriPanel,
+    font=\displayfont\bfseries\fontsize{42}{42}\selectfont
+  ] at (192,5) {31431};
+
+  % Header.
+  \node[
+    anchor=west,
+    font=\displayfont\bfseries\fontsize{7.8}{9}\selectfont,
+    text=MoriLavender
+  ] at (18,263) {TECHNICAL SECURITY RESEARCH REPORT};
+  \node[
+    anchor=east,
+    font=\ttfamily\bfseries\fontsize{8.4}{9}\selectfont,
+    text=MoriPurple
+  ] at (192,263) {CVE-2026-31431};
+
+  % Main title.
+  \node[
+    anchor=west,
+    inner sep=0pt,
+    font=\displayfont\bfseries\fontsize{42}{44}\selectfont,
+    text=MoriPaper
+  ] at (18,221) {COPY \textcolor{MoriPurple}{FAIL}};
+
+  \node[
+    anchor=north west,
+    inner sep=0pt,
+    text width=154mm,
+    align=left,
+    font=\displayfont\fontsize{18}{21}\selectfont,
+    text=MoriPaper
+  ] at (18,207) {A Controlled Reproduction, Detection,\\
+    and Mitigation of a Linux Kernel\\
+    Local Privilege Escalation};
+
+  \node[
+    anchor=west,
+    inner sep=0pt,
+    font=\displayfont\bfseries\fontsize{7.1}{8}\selectfont,
+    text=MoriGray
+  ] at (18,151) {LINUX KERNEL\enspace
+    \textcolor{MoriPurple}{\textbullet}\enspace
+    LOCAL PRIVILEGE ESCALATION\enspace
+    \textcolor{MoriPurple}{\textbullet}\enspace
+    CONTROLLED LAB};
+
+  % Front-cover evidence panel.
+  \fill[MoriPanel,opacity=0.94] (18,25) rectangle (192,65);
+  \draw[MoriMuted,line width=0.35pt] (18,25) rectangle (192,65);
+  \fill[MoriPurple] (18,25) rectangle (19,65);
+
+  \node[cover-key,anchor=north west] at (24,59) {AUTHOR};
+  \node[cover-value,anchor=north west] at (24,53) {Denis Krüger};
+  \node[cover-key,anchor=north west] at (83,59) {PROJECT};
+  \node[cover-value,anchor=north west] at (83,53) {Copy Fail Security Lab};
+  \node[cover-key,anchor=north west] at (146,59) {SEVERITY};
+  \node[cover-value,anchor=north west] at (146,53) {High / CVSS 7.8};
+
+  \node[cover-key,anchor=north west] at (24,43) {ENVIRONMENT};
+  \node[cover-value,anchor=north west] at (24,37) {Isolated Proxmox Lab};
+  \node[cover-key,anchor=north west] at (83,43) {FOCUS};
+  \node[cover-value,anchor=north west] at (83,37) {Reproduce / Detect / Mitigate};
+  \node[cover-key,anchor=north west] at (146,43) {REPORT DATE};
+  \node[cover-value,anchor=north west] at (146,37) {\ReportDate};
+
+  \node[cover-small,anchor=west] at (18,13)
+    {Security research laboratory project};
+  \node[cover-small,anchor=east] at (192,13)
+    {controlled environment / documented evidence};
+}
+
+\newcommand{\DrawBackPanel}{%
+  \fill[MoriNight] (-3,-3) rectangle (213,300);
+
+  % Mirrored fore-edge accent and dossier rule.
+  \fill[MoriPurple] (0,0) rectangle (5,297);
+  \draw[MoriPurple,line width=0.65pt] (18,276) -- (192,276);
+
+  % Back cover: mirror the artwork and place its body at the binding edge
+  % (right), allowing the wing to open outward across the back.
+  \node[anchor=north east,inner sep=0pt,opacity=0.50]
+    at (460,197) {\reflectbox{\MothGraphic{500mm}}};
+
+  % Small archive header.
+  \node[
+    anchor=west,
+    font=\displayfont\bfseries\fontsize{7.8}{9}\selectfont,
+    text=MoriLavender
+  ] at (18,263) {CONTROLLED SECURITY RESEARCH};
+  \node[
+    anchor=east,
+    font=\ttfamily\bfseries\fontsize{8.2}{9}\selectfont,
+    text=MoriPurple
+  ] at (192,263) {REPORT FROZEN // \ReportDateISO};
+
+  % A single evidence-panel monologue, styled to match the metadata panel on
+  % the front while leaving the lower moth wing visible around it.
+  \fill[MoriPanel,opacity=0.90] (18,103) rectangle (192,247);
+  \draw[MoriMuted,line width=0.35pt] (18,103) rectangle (192,247);
+  \fill[MoriPurple] (18,103) rectangle (19,247);
+
+  \node[
+    anchor=north west,
+    inner sep=0pt,
+    font=\displayfont\bfseries\fontsize{13.4}{15}\selectfont,
+    text=MoriPurple
+  ] at (25,235) {SO, WHY DID I DECIDE TO DO THIS?};
+
+  \node[
+    anchor=north west,
+    inner sep=0pt,
+    text=MoriPaper
+  ] at (25,218) {%
+    \begin{minipage}{154mm}
+      \displayfont\fontsize{10.7}{13.8}\selectfont
+      \setlength{\parskip}{0.58em}
+      \raggedright
+      {\bfseries Honestly? Curiosity.}
+
+      Reading ``Linux kernel local privilege escalation'' and thinking
+      ``huh, interesting'' was apparently not where my brain intended to stop.
+
+      I wanted to know whether I could reproduce \emph{Copy Fail} safely. Once
+      I could, I wanted to understand what the system exposed while it happened.
+      Then detect it. Then contain it. Then verify the vendor fix.
+
+      Each answer produced another question, another test, and---somehow---another
+      section.
+
+      I did not start this project knowing exactly how every part would work. I
+      started with an isolated Proxmox lab and the slightly unreasonable belief
+      that, if I documented everything carefully enough, I could figure it out.
+
+      Somewhere along the way, that became an eBPF monitor, a compensating
+      control, a vendor-mitigation retest, and 146 pages of evidence.
+
+      {\bfseries This report is what happened next.}
+    \end{minipage}%
+  };
+
+  \draw[MoriMuted,line width=0.3pt] (25,124) -- (185,124);
+  \node[
+    anchor=west,
+    inner sep=0pt,
+    font=\displayfont\bfseries\fontsize{6.7}{8}\selectfont,
+    text=MoriPurple
+  ] at (25,114) {CURIOSITY // EVIDENCE // REPRODUCIBILITY};
+  \node[
+    anchor=east,
+    inner sep=0pt,
+    font=\ttfamily\bfseries\fontsize{6.7}{8}\selectfont,
+    text=MoriLavender
+  ] at (185,114) {REPORT FROZEN // \ReportDateISO};
+
+  \draw[MoriPurple,line width=0.65pt] (18,18) -- (192,18);
+  \node[cover-small,anchor=west] at (18,10)
+    {DENIS KRÜGER // 0N1S3C};
+  \node[cover-small,anchor=east] at (192,10)
+    {146 PAGES // CVE-2026-31431};
+}
+
+% ------------------------------------------------------------
+% A4 front and back pages used in normal report mode
+% ------------------------------------------------------------
+
+\newcommand{\MakeFrontCover}{%
+  \begin{titlepage}
+    \thispagestyle{empty}
+    \begin{tikzpicture}[remember picture,overlay,x=1mm,y=1mm]
+      \begin{scope}[shift={(current page.south west)}]
+        \clip (0,0) rectangle (210,297);
+        \DrawFrontPanel
+      \end{scope}
+    \end{tikzpicture}
+    \null
+  \end{titlepage}%
+}
+
+\newcommand{\MakeBackCover}{%
+  \clearpage
+  \thispagestyle{empty}
+  \begin{tikzpicture}[remember picture,overlay,x=1mm,y=1mm]
+    \begin{scope}[shift={(current page.south west)}]
+      \clip (0,0) rectangle (210,297);
+      \DrawBackPanel
+    \end{scope}
+  \end{tikzpicture}
+  \null
+  \clearpage
+}
+
+% ------------------------------------------------------------
+% One-piece print wrap used in print-wrap mode
+% ------------------------------------------------------------
+
+\newcommand{\MakePrintWrap}{%
+  \thispagestyle{empty}
+  \begin{tikzpicture}[remember picture,overlay]
+    % Continuous full-bleed field.
+    \fill[MoriNight]
+      (current page.south west) rectangle (current page.north east);
+
+    % Back panel: includes top, bottom, and outer bleed but stops at spine.
+    \begin{scope}[
+      shift={([xshift=\CoverBleed,yshift=\CoverBleed]current page.south west)},
+      x=1mm,
+      y=1mm
+    ]
+      \clip (-3,-3) rectangle (210,300);
+      \DrawBackPanel
+    \end{scope}
+
+    % Front panel: includes top, bottom, and outer bleed but stops at spine.
+    \begin{scope}[
+      shift={([xshift=\dimexpr\CoverBleed+\TrimWidth+\SpineWidth\relax,
+               yshift=\CoverBleed]current page.south west)},
+      x=1mm,
+      y=1mm
+    ]
+      \clip (0,-3) rectangle (213,300);
+      \DrawFrontPanel
+    \end{scope}
+
+    % Spine bounds derived from the trim and bleed values.
+    \coordinate (SpineSW) at
+      ([xshift=\dimexpr\CoverBleed+\TrimWidth\relax]current page.south west);
+    \coordinate (SpineNE) at
+      ([xshift=-\dimexpr\CoverBleed+\TrimWidth\relax]current page.north east);
+
+    \shade[left color=MoriDeepPurple,right color=MoriElectric]
+      (SpineSW) rectangle (SpineNE);
+    \draw[MoriNight,line width=0.8pt]
+      (SpineSW) -- ($(SpineSW)+(0,\WrapHeight)$);
+    \draw[MoriNight,line width=0.8pt]
+      (SpineNE) -- ($(SpineNE)+(0,-\WrapHeight)$);
+
+    \node[
+      rotate=-90,
+      font=\displayfont\bfseries\fontsize{15}{16}\selectfont,
+      text=MoriPaper
+    ] at ($(SpineSW)!0.82!(SpineNE)$) {COPY \textcolor{MoriNight}{FAIL}};
+
+    \node[
+      rotate=-90,
+      font=\displayfont\fontsize{9}{10}\selectfont,
+      text=MoriPaper
+    ] at ($(SpineSW)!0.50!(SpineNE)$) {CVE-2026-31431};
+
+    \node[
+      rotate=-90,
+      font=\displayfont\bfseries\fontsize{9}{10}\selectfont,
+      text=MoriPaper
+    ] at ($(SpineSW)!0.18!(SpineNE)$) {DENIS KRÜGER};
+  \end{tikzpicture}
+  \null
+  \clearpage
+}
+
 % ============================================================
 % DOCUMENT
 % ============================================================
+
 \begin{document}
-% Avoid a duplicate PDF page anchor when numbering restarts after the cover.
-\hypersetup{pageanchor=false}
-% ============================================================
-% TITLE PAGE
-% ============================================================
-\begin{titlepage}
-    \thispagestyle{empty}
-    % Full-bleed cover. The report body remains deliberately light for
-    % readability and printing; the dark treatment is isolated to this page.
-    \begin{tikzpicture}[remember picture,overlay]
-        \fill[MoriNight]
-            (current page.south west) rectangle (current page.north east);
-        \fill[MoriPurple]
-            (current page.north west)
-            rectangle ([xshift=7mm]current page.south west);
-        \draw[MoriPurple,line width=1.1pt]
-            ([xshift=18mm,yshift=-21mm]current page.north west)
-            --
-            ([xshift=-18mm,yshift=-21mm]current page.north east);
-        % Project moth mark. The supplied artwork is kept deliberately ghosted
-        % so the cover reads as a research dossier first and MORI second.
-        \node[
-            anchor=north east,
-            inner sep=0pt,
-            opacity=0.22
-        ] at ([xshift=250mm,yshift=-100mm]current page.north east) {%
-            \includegraphics[width=500mm]{assets/moth-cover.png}%
-        };
-        \node[
-            anchor=south east,
-            inner sep=0pt,
-            text=MoriPanel,
-            font=\displayfont\bfseries\fontsize{52}{52}\selectfont
-        ] at ([xshift=-16mm,yshift=10mm]current page.south east)
-            {31431};
-    \end{tikzpicture}
-    \color{MoriPaper}
-    \vspace*{0.35cm}
-    {\displayfont\scriptsize\bfseries\color{MoriLavender}
-        TECHNICAL SECURITY RESEARCH REPORT
-        \hfill
-        {\ttfamily\small\bfseries\color{MoriPurple}CVE-2026-31431}
-        \par
-    }
-    \vspace{2.25cm}
-    {\displayfont\bfseries\fontsize{54}{52}\selectfont
-        COPY\\\\[-0.03em]
-        \textcolor{MoriPurple}{FAIL}
-        \par
-    }
-    \vspace{0.75cm}
-    {\displayfont\LARGE\color{MoriPaper}
-        A Controlled Reproduction, Detection,\\\\[0.15em]
-        and Mitigation of a Linux Kernel\\\\[0.15em]
-        Local Privilege Escalation
-        \par
-    }
-    \vspace{0.75cm}
-    {\displayfont\scriptsize\bfseries\color{MoriGray}
-        LINUX KERNEL\enspace
-        \textcolor{MoriPurple}{//}\enspace
-        LOCAL PRIVILEGE ESCALATION\enspace
-        \textcolor{MoriPurple}{//}\enspace
-        CONTROLLED LAB
-        \par
-    }
-    \vfill
-    \begin{tcolorbox}[
-        enhanced,
-        sharp corners,
-        boxrule=0.45pt,
-        colback=MoriPanel,
-        colframe=MoriMuted,
-        borderline west={2.4pt}{0pt}{MoriPurple},
-        left=5mm,
-        right=5mm,
-        top=4mm,
-        bottom=4mm
-    ]
-        \begin{tabularx}{\linewidth}{@{}Y Y Y@{}}
-            \coverkey{Author}\par
-            \covervalue{Denis Krüger}
-            &
-            \coverkey{Project}\par
-            \covervalue{Copy Fail Security Lab}
-            &
-            \coverkey{Severity}\par
-            \covervalue{High / CVSS 7.8}
-            \\\\[1.15em]
-            \coverkey{Environment}\par
-            \covervalue{Isolated Proxmox Lab}
-            &
-            \coverkey{Focus}\par
-            \covervalue{Reproduce / Detect / Mitigate}
-            &
-            \coverkey{Report Date}\par
-            \covervalue{\today}
-        \end{tabularx}
-    \end{tcolorbox}
-    \vspace{0.55cm}
-    {\displayfont\scriptsize\color{MoriGray}
-        Security research laboratory project
-        \hfill
-        controlled environment / documented evidence
-    }
-    \vspace{0.45cm}
-\end{titlepage}
-\color{MoriInk}
-\hypersetup{pageanchor=true}
-% ============================================================
-% FRONT MATTER
-% ============================================================
-\pagenumbering{roman}
-% ------------------------------------------------------------
-% Abstract
-% ------------------------------------------------------------
-\section*{Abstract}
-\addcontentsline{toc}{section}{Abstract}
-\begin{tcolorbox}[
+
+\ifPrintWrap
+
+  % Print-wrap mode intentionally produces exactly one oversized page.
+  \hypersetup{pageanchor=false}
+  \pagestyle{empty}
+  \MakePrintWrap
+
+\else
+
+  % ----------------------------------------------------------
+  % Front cover
+  % ----------------------------------------------------------
+
+  \hypersetup{pageanchor=false}
+  \MakeFrontCover
+  \color{MoriInk}
+  \hypersetup{pageanchor=true}
+
+  % ----------------------------------------------------------
+  % Front matter
+  % ----------------------------------------------------------
+
+  \pagenumbering{roman}
+
+  \section*{Abstract}
+  \addcontentsline{toc}{section}{Abstract}
+
+  \begin{tcolorbox}[
     enhanced,
     breakable,
     sharp corners,
@@ -460,98 +720,115 @@
     right=2mm,
     top=1mm,
     bottom=1mm
-]
-This report documents the controlled analysis, reproduction, detection,
-mitigation, and retesting of CVE-2026-31431, commonly referred to as
-\emph{Copy Fail}.
-\par\medskip
-The research is conducted within an isolated laboratory environment and
-focuses not only on demonstrating the vulnerability, but on understanding
-the affected Linux kernel functionality, identifying observable behaviour,
-developing a custom detection strategy, evaluating a compensating control,
-and comparing those results with vendor-provided mitigations and patches.
-\par\medskip
-Evidence is collected throughout the experiment and preserved separately
-from the analytical report. Raw evidence is retained privately, while
-sanitized artifacts intended for public release receive their own integrity
-verification before being added to the repository.
-\end{tcolorbox}
-\clearpage
-% ------------------------------------------------------------
-% Table of contents
-% ------------------------------------------------------------
-\markboth{Contents}{}
-\tableofcontents
-\clearpage
-% ============================================================
-% MAIN REPORT
-% ============================================================
-\pagenumbering{arabic}
-\input{sections/01-research}
-\clearpage
-\input{sections/02-lab-setup}
-\clearpage
-\input{sections/03-clean-baseline}
-\clearpage
-\input{sections/04-vulnerability-analysis}
-\clearpage
-\input{sections/05-reproduction}
-\clearpage
-\input{sections/06-detection}
-\clearpage
-\input{sections/07-compensating-control}
-\clearpage
-\input{sections/08-vendor-mitigation}
-\clearpage
-\input{sections/09-retest}
-\clearpage
-\input{sections/10-lessons-learned}
-% ============================================================
-% REFERENCES
-% ============================================================
-\clearpage
-\markright{References}
-\addcontentsline{toc}{section}{References}
-\begin{thebibliography}{9}
-\bibitem{ubuntu-copyfail-cve}
-Canonical,
-``CVE-2026-31431,'' 2026.
-\url{https://ubuntu.com/security/CVE-2026-31431}.
-Accessed 8 August 2026.
-\bibitem{ubuntu-copyfail-fixes}
-L. Stanescu,
-``Fixes available for CVE-2026-31431 (Copy Fail) Linux Kernel Local Privilege
-Escalation Vulnerability,'' Canonical, 30 April 2026.
-\url{https://ubuntu.com/blog/copy-fail-vulnerability-fixes-available}.
-Accessed 8 August 2026.
-\bibitem{cve-copyfail}
-Linux Kernel CNA,
-``CVE-2026-31431: crypto: algif\_aead -- Revert to operating out-of-place,''
-2026.
-\url{https://www.cve.org/CVERecord?id=CVE-2026-31431}.
-Accessed 8 August 2026.
-\bibitem{linux-copyfail-fix}
-H. Xu,
-``crypto: algif\_aead -- Revert to operating out-of-place,'' 2026,
-upstream commit \code{a664bf3d603dc3bdcf9ae47cc21e0daec706d7a5}.
-\url{https://www.spinics.net/lists/stable/msg939222.html}.
-Accessed 8 August 2026.
-\bibitem{copyfail-research}
-J. Im,
-\emph{Copy Fail: 732 Bytes to Root on Every Major Linux Distribution}, Xint,
-29 April 2026.
-\url{https://xint.io/blog/copy-fail-linux-distributions}.
-Accessed 23 August 2026.
-\end{thebibliography}
-% ============================================================
-% APPENDICES
-% ============================================================
-\clearpage
-\appendix
-% ------------------------------------------------------------
-% Appendix A is maintained as a separate, versioned source file so that the
-% evidence catalogue can be revised without rewriting the report preamble or
-% analytical chapters.
-\input{sections/AppendixA}
+  ]
+  This report documents the controlled analysis, reproduction, detection,
+  mitigation, and retesting of CVE-2026-31431, commonly referred to as
+  \emph{Copy Fail}.
+
+  The research is conducted within an isolated laboratory environment and
+  focuses not only on demonstrating the vulnerability, but on understanding
+  the affected Linux kernel functionality, identifying observable behaviour,
+  developing a custom detection strategy, evaluating a compensating control,
+  and comparing those results with vendor-provided mitigations and patches.
+
+  Evidence is collected throughout the experiment and preserved separately
+  from the analytical report. Raw evidence is retained privately, while
+  sanitized artifacts intended for public release receive their own integrity
+  verification before being added to the repository.
+  \end{tcolorbox}
+
+  \clearpage
+  \markboth{Contents}{}
+  \tableofcontents
+  \clearpage
+
+  % ----------------------------------------------------------
+  % Main report
+  % ----------------------------------------------------------
+
+  \pagenumbering{arabic}
+
+  \input{sections/01-research}
+  \clearpage
+  \input{sections/02-lab-setup}
+  \clearpage
+  \input{sections/03-clean-baseline}
+  \clearpage
+  \input{sections/04-vulnerability-analysis}
+  \clearpage
+  \input{sections/05-reproduction}
+  \clearpage
+  \input{sections/06-detection}
+  \clearpage
+  \input{sections/07-compensating-control}
+  \clearpage
+  \input{sections/08-vendor-mitigation}
+  \clearpage
+  \input{sections/09-retest}
+  \clearpage
+  \input{sections/10-lessons-learned}
+
+  % ----------------------------------------------------------
+  % References
+  % ----------------------------------------------------------
+
+  \clearpage
+  \markright{References}
+  \addcontentsline{toc}{section}{References}
+
+  \begin{thebibliography}{9}
+
+  \bibitem{ubuntu-copyfail-cve}
+  Canonical,
+  ``CVE-2026-31431,'' 2026.
+  \url{https://ubuntu.com/security/CVE-2026-31431}.
+  Accessed 8 August 2026.
+
+  \bibitem{ubuntu-copyfail-fixes}
+  L. Stanescu,
+  ``Fixes available for CVE-2026-31431 (Copy Fail) Linux Kernel Local Privilege
+  Escalation Vulnerability,'' Canonical, 30 April 2026.
+  \url{https://ubuntu.com/blog/copy-fail-vulnerability-fixes-available}.
+  Accessed 8 August 2026.
+
+  \bibitem{cve-copyfail}
+  Linux Kernel CNA,
+  ``CVE-2026-31431: crypto: algif\_aead -- Revert to operating out-of-place,''
+  2026.
+  \url{https://www.cve.org/CVERecord?id=CVE-2026-31431}.
+  Accessed 8 August 2026.
+
+  \bibitem{linux-copyfail-fix}
+  H. Xu,
+  ``crypto: algif\_aead -- Revert to operating out-of-place,'' 2026,
+  upstream commit \code{a664bf3d603dc3bdcf9ae47cc21e0daec706d7a5}.
+  \url{https://www.spinics.net/lists/stable/msg939222.html}.
+  Accessed 8 August 2026.
+
+  \bibitem{copyfail-research}
+  J. Im,
+  \emph{Copy Fail: 732 Bytes to Root on Every Major Linux Distribution}, Xint,
+  29 April 2026.
+  \url{https://xint.io/blog/copy-fail-linux-distributions}.
+  Accessed 23 August 2026.
+
+  \end{thebibliography}
+
+  % ----------------------------------------------------------
+  % Appendices
+  % ----------------------------------------------------------
+
+  \clearpage
+  \appendix
+  \input{sections/AppendixA}
+
+  % ----------------------------------------------------------
+  % Back cover
+  % ----------------------------------------------------------
+
+  \hypersetup{pageanchor=false}
+  \MakeBackCover
+
+\fi
 
 \end{document}
